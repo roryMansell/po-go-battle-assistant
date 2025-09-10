@@ -29,8 +29,12 @@ cd po-go-battle-assistant
 python -m http.server 8000
 ```
 ## 🖥️ Download
-Grab the latest [release](https://github.com/roryMansell/po-go-battle-assistant/releases).
+## 🖥️ Download
+- [Installer (recommended)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/Voice%20Pokedex%20Setup%201.0.0.exe)
+- [Portable (no install)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/VoicePokedex-win64.zip)
 
-1. Download `VoicePokedex-win64.zip`
-2. Extract it somewhere
-3. Double-click `Voice Pokedex.exe`
+## Languages and technologies
+
+Frontend: HTML, CSS, JavaScript (interactive UI, offline data handling, voice input)
+Data prep: Python (scripts for JSON + sprite processing)
+Desktop packaging: Electron (Node.js ecosystem)
