@@ -30,7 +30,7 @@ python -m http.server 8000
 ```
 ## 🖥️ Download
 
-- [Installer (recommended)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/Voice%20Pokedex%20Setup%201.0.0.exe)
+- [Installer (recommended)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/Voice.Pokedex.Setup.1.0.0.exe)
 - [Portable (no install)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/VoicePokedex-win64.zip)
 
 ## Languages and technologies
