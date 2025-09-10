@@ -6,7 +6,7 @@ Built with **HTML/CSS/JS**, powered by **local JSON + sprites**, and completely 
 ---
 
 ## ✨ Features
-- 🎤 **Voice recognition** (Web Speech API) — say a Pokémon’s name to instantly fetch its info.  
+- 🎤 **Voice recognition** (Web Speech API) — say a Pokémon’s name to instantly fetch its info. (Not avaialble in desktop build) 
 - ⌨️ **Fallback search** — type or pick from a dropdown.  
 - 🧩 **Type matchups** — see weaknesses, resistances, and immunities using a Gen-9 style type chart.  
 - 🖼 **Sprites included offline** — official artwork and in-game sprites packaged locally.  
@@ -50,3 +50,4 @@ Desktop packaging: Electron (Node.js ecosystem)
 Data & sprites belong to their respective creators (Pokémon © Nintendo/Game Freak).
 
 This project is for educational and portfolio use only.
+

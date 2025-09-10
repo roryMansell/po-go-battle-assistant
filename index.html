@@ -29,14 +29,8 @@
     .stat b { font-size: 18px; }
     .weak { color: var(--bad); }
     .res { color: var(--good); }
-   .team {
-      display: grid;
-      grid-template-columns: 1fr; /* single column */
-      gap: 10px;
-    }
-    .team .slot {
-      width: 100%;
-    }
+    .team { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .team .slot { width: 100%; }
     .rankings { display:grid; gap:10px; }
     .rank-item { background:#0f1734; border:1px solid #2a396b; border-radius:12px; padding:10px; display:flex; align-items:center; justify-content:space-between; }
     .rank-item .l { display:flex; align-items:center; gap:10px; }
@@ -44,20 +38,23 @@
     .score { font-variant-numeric: tabular-nums; font-weight:700; }
     .hidden { display:none !important; }
     .voice-btn { display:flex; align-items:center; gap:8px; justify-content:center; }
+    #voiceBtn.disabled { opacity: .5; cursor: not-allowed; }
     .mic { width: 10px; height: 20px; border-radius: 10px; border:2px solid #6ee7ff; position:relative; }
     .mic::after { content:""; position:absolute; bottom:-6px; left:50%; transform:translateX(-50%); width:12px; height:2px; background:#6ee7ff; }
     footer { max-width:1100px; margin: 0 auto 40px; padding: 0 22px; color: var(--muted); }
     a { color: var(--accent); }
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#0e1530; border:1px solid #2a396b; padding:2px 6px; border-radius:6px; }
+    @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
     <h1>🎙️ Voice Pokédex (offline) — weaknesses, resistances & team ranking</h1>
   </header>
+
   <main>
-    <section class="card">
-      <div class="row">
+    <section class="card" aria-label="Controls">
+      <div class="row" role="group" aria-label="Search">
         <div>
           <label for="nameInput">Pokémon name</label>
           <input id="nameInput" placeholder="e.g. Charizard" autocomplete="off" />
@@ -65,27 +62,36 @@
         </div>
         <div>
           <label for="nameSelect">Quick select</label>
-          <select id="nameSelect"></select>
+          <select id="nameSelect" aria-label="Quick select Pokémon"></select>
         </div>
       </div>
+
       <div class="row" style="margin-top:10px;">
-        <button id="voiceBtn" class="voice-btn"><span class="mic"></span><span id="voiceLabel">Hold to speak</span></button>
+        <button id="voiceBtn" class="voice-btn" aria-label="Hold to speak">
+          <span class="mic" aria-hidden="true"></span>
+          <span id="voiceLabel">Hold to speak</span>
+        </button>
         <button id="showBtn">Show info</button>
       </div>
-      <div class="hint">Voice tips: Press and hold the mic, say the name (e.g., <span class="kbd">pikachu</span>), release. Works best in Chrome / Edge.</div>
+
+      <div class="hint" id="voiceHint">
+        Voice tips: Press and hold the mic, say the name (e.g., <span class="kbd">pikachu</span>), release. Works best in Chrome / Edge.
+      </div>
+
       <hr style="border-color:#1e294f; margin:14px 0; opacity:.5;"/>
+
       <div>
         <label>My team (pick up to 3)</label>
-        <div class="team" id="teamSlots"></div>
+        <div class="team" id="teamSlots" aria-live="polite"></div>
         <div class="row" style="margin-top:10px;">
-          <select id="teamSelect"></select>
+          <select id="teamSelect" aria-label="Add Pokémon to team"></select>
           <button id="addToTeamBtn">Add to team</button>
         </div>
         <div class="hint">Team is saved locally in your browser (no internet needed).</div>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" aria-label="Results">
       <div id="result" class="hidden">
         <div class="result">
           <div>
@@ -109,313 +115,322 @@
       <div id="emptyState" class="hint">Choose a Pokémon to see its matchups.</div>
     </section>
   </main>
+
   <footer>
-    <p><b>Offline data:</b> This page looks for <span class="kbd">data/pokemon.min.json</span> and local sprites in <span class="kbd">sprites/</span> (e.g. <span class="kbd">sprites/006.png</span>). If not found, it falls back to a tiny built‑in sample so you can test instantly. Replace the JSON with a full dataset for all Pokémon.</p>
+    <p><b>Offline data:</b> This page looks for <span class="kbd">data/pokemon.min.json</span> and local sprites in <span class="kbd">sprites/</span> (e.g. <span class="kbd">sprites/006.png</span>). If not found, it falls back to a tiny built-in sample so you can test instantly. Replace the JSON with a full dataset for all Pokémon.</p>
+    <p class="hint">Voice search works in the browser build (Chrome/Edge). The desktop app runs fully offline but does not include voice input.</p>
   </footer>
 
-<script>
-// ------------------ Type Chart (attack -> defense multiplier) ------------------
-// Gen-9 style simplified chart. 1 means neutral. 2 super-effective. 0.5 resisted. 0 immune.
-const TYPES = [
-  'normal','fire','water','electric','grass','ice','fighting','poison','ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'
-];
+  <script>
+  // ------------------ Type Chart (attack -> defense multiplier) ------------------
+  const TYPES = [
+    'normal','fire','water','electric','grass','ice','fighting','poison','ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'
+  ];
+  const TYPE_CHART = {
+    normal:   { rock:.5, ghost:0, steel:.5 },
+    fire:     { fire:.5, water:.5, grass:2, ice:2, bug:2, rock:.5, dragon:.5, steel:2 },
+    water:    { fire:2, water:.5, grass:.5, ground:2, rock:2, dragon:.5 },
+    electric: { water:2, electric:.5, grass:.5, ground:0, flying:2, dragon:.5 },
+    grass:    { fire:.5, water:2, grass:.5, poison:.5, ground:2, flying:.5, bug:.5, rock:2, dragon:.5, steel:.5 },
+    ice:      { fire:.5, water:.5, grass:2, ground:2, flying:2, dragon:2, steel:.5 },
+    fighting: { normal:2, ice:2, rock:2, dark:2, steel:2, poison:.5, flying:.5, psychic:.5, bug:.5, fairy:.5, ghost:0 },
+    poison:   { grass:2, poison:.5, ground:.5, rock:.5, ghost:.5, steel:0, fairy:2 },
+    ground:   { fire:2, electric:2, grass:.5, poison:2, flying:0, bug:.5, rock:2, steel:2 },
+    flying:   { electric:.5, grass:2, fighting:2, bug:2, rock:.5, steel:.5 },
+    psychic:  { fighting:2, poison:2, psychic:.5, dark:0, steel:.5 },
+    bug:      { fire:.5, grass:2, fighting:.5, poison:.5, flying:.5, psychic:2, ghost:.5, dark:2, steel:.5, fairy:.5 },
+    rock:     { fire:2, ice:2, fighting:.5, ground:.5, flying:2, bug:2, steel:.5 },
+    ghost:    { normal:0, psychic:2, dark:.5 },
+    dragon:   { dragon:2, steel:.5, fairy:0 },
+    dark:     { fighting:.5, psychic:2, ghost:2, dark:.5, fairy:.5 },
+    steel:    { fire:.5, water:.5, electric:.5, ice:2, rock:2, fairy:2, steel:.5 },
+    fairy:    { fire:.5, fighting:2, poison:.5, dragon:2, dark:2, steel:.5 }
+  };
 
-const TYPE_CHART = {
-  normal:   { rock:.5, ghost:0, steel:.5 },
-  fire:     { fire:.5, water:.5, grass:2, ice:2, bug:2, rock:.5, dragon:.5, steel:2 },
-  water:    { fire:2, water:.5, grass:.5, ground:2, rock:2, dragon:.5 },
-  electric: { water:2, electric:.5, grass:.5, ground:0, flying:2, dragon:.5 },
-  grass:    { fire:.5, water:2, grass:.5, poison:.5, ground:2, flying:.5, bug:.5, rock:2, dragon:.5, steel:.5 },
-  ice:      { fire:.5, water:.5, grass:2, ground:2, flying:2, dragon:2, steel:.5 },
-  fighting: { normal:2, ice:2, rock:2, dark:2, steel:2, poison:.5, flying:.5, psychic:.5, bug:.5, fairy:.5, ghost:0 },
-  poison:   { grass:2, poison:.5, ground:.5, rock:.5, ghost:.5, steel:0, fairy:2 },
-  ground:   { fire:2, electric:2, grass:.5, poison:2, flying:0, bug:.5, rock:2, steel:2 },
-  flying:   { electric:.5, grass:2, fighting:2, bug:2, rock:.5, steel:.5 },
-  psychic:  { fighting:2, poison:2, psychic:.5, dark:0, steel:.5 },
-  bug:      { fire:.5, grass:2, fighting:.5, poison:.5, flying:.5, psychic:2, ghost:.5, dark:2, steel:.5, fairy:.5 },
-  rock:     { fire:2, ice:2, fighting:.5, ground:.5, flying:2, bug:2, steel:.5 },
-  ghost:    { normal:0, psychic:2, dark:.5 },
-  dragon:   { dragon:2, steel:.5, fairy:0 },
-  dark:     { fighting:.5, psychic:2, ghost:2, dark:.5, fairy:.5 },
-  steel:    { fire:.5, water:.5, electric:.5, ice:2, rock:2, fairy:2, steel:.5 },
-  fairy:    { fire:.5, fighting:2, poison:.5, dragon:2, dark:2, steel:.5 }
-};
-
-function effectiveness(attackType, defendTypes){
-  let mult = 1;
-  const rules = TYPE_CHART[attackType] || {};
-  for (const dt of defendTypes){
-    const m = rules[dt];
-    if (m === 0) return 0; // immunity dominates
-    if (m) mult *= m;
-  }
-  return mult;
-}
-
-function defendMultipliers(defendTypes){
-  // Aggregate incoming damage from each attack type vs a defender typing
-  const out = {};
-  for (const atk of TYPES){
-    out[atk] = effectiveness(atk, defendTypes);
-  }
-  return out;
-}
-
-// ------------------ Minimal Sample Data (fallback) ------------------
-// If you provide data/pokemon.min.json, the app will use that instead.
-// Schema: [{id:1,name:"Bulbasaur",types:["grass","poison"],stats:{hp:45,atk:49,def:49,spa:65,spd:65,spe:45}}, ...]
-const SAMPLE_DATA = [
-  {id:1,name:"Bulbasaur",types:["grass","poison"],stats:{hp:45,atk:49,def:49,spa:65,spd:65,spe:45}},
-  {id:4,name:"Charmander",types:["fire"],stats:{hp:39,atk:52,def:43,spa:60,spd:50,spe:65}},
-  {id:6,name:"Charizard",types:["fire","flying"],stats:{hp:78,atk:84,def:78,spa:109,spd:85,spe:100}},
-  {id:7,name:"Squirtle",types:["water"],stats:{hp:44,atk:48,def:65,spa:50,spd:64,spe:43}},
-  {id:25,name:"Pikachu",types:["electric"],stats:{hp:35,atk:55,def:40,spa:50,spd:50,spe:90}},
-  {id:94,name:"Gengar",types:["ghost","poison"],stats:{hp:60,atk:65,def:60,spa:130,spd:75,spe:110}},
-  {id:149,name:"Dragonite",types:["dragon","flying"],stats:{hp:91,atk:134,def:95,spa:100,spd:100,spe:80}},
-  {id:131,name:"Lapras",types:["water","ice"],stats:{hp:130,atk:85,def:80,spa:85,spd:95,spe:60}},
-  {id:143,name:"Snorlax",types:["normal"],stats:{hp:160,atk:110,def:65,spa:65,spd:110,spe:30}},
-  {id:212,name:"Scizor",types:["bug","steel"],stats:{hp:70,atk:130,def:100,spa:55,spd:80,spe:65}}
-];
-
-let POKEMON = SAMPLE_DATA;
-
-async function tryLoadExternalData(){
-  try {
-    const res = await fetch('data/pokemon.min.json');
-    if (!res.ok) return; 
-    const json = await res.json();
-    if (Array.isArray(json) && json.length) {
-      POKEMON = json;
-      console.log(`Loaded external dataset with ${json.length} Pokémon.`);
+  function effectiveness(attackType, defendTypes){
+    let mult = 1;
+    const rules = TYPE_CHART[attackType] || {};
+    for (const dt of defendTypes){
+      const m = rules[dt];
+      if (m === 0) return 0; // immunity dominates
+      if (m) mult *= m;
     }
-  } catch(e){ console.warn('Using built-in sample data.', e); }
-}
-
-// ------------------ UI + Logic ------------------
-const nameInput = document.getElementById('nameInput');
-const nameSelect = document.getElementById('nameSelect');
-const teamSelect = document.getElementById('teamSelect');
-const addToTeamBtn = document.getElementById('addToTeamBtn');
-const teamSlots = document.getElementById('teamSlots');
-const voiceBtn = document.getElementById('voiceBtn');
-const voiceLabel = document.getElementById('voiceLabel');
-const showBtn = document.getElementById('showBtn');
-const resultEl = document.getElementById('result');
-const emptyState = document.getElementById('emptyState');
-const titleEl = document.getElementById('title');
-const typesEl = document.getElementById('types');
-const weakEl = document.getElementById('weakTo');
-const resEl = document.getElementById('resists');
-const immEl = document.getElementById('immune');
-const spriteEl = document.getElementById('sprite');
-const vsName = document.getElementById('vsName');
-const rankingsEl = document.getElementById('rankings');
-
-function byName(name){
-  name = (name || '').toString().trim().toLowerCase();
-  if (!name) return null;
-  // exact match first
-  let p = POKEMON.find(x => x.name.toLowerCase() === name);
-  if (p) return p;
-  // fuzzy: startsWith then includes
-  p = POKEMON.find(x => x.name.toLowerCase().startsWith(name)) || POKEMON.find(x => x.name.toLowerCase().includes(name));
-  return p || null;
-}
-
-function formatTypes(types){
-  return types.map(t=>`<span class="type">${t}</span>`).join('');
-}
-
-function listFromMults(m){
-  const entries = Object.entries(m);
-  const weak = entries.filter(([,v])=>v>1).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`${t}×${v}`);
-  const res = entries.filter(([,v])=>v>0 && v<1).sort((a,b)=>a[1]-b[1]).map(([t,v])=>`${t}×${v}`);
-  const imm = entries.filter(([,v])=>v===0).map(([t])=>t);
-  return {weak, res, imm};
-}
-
-function bestAttackMultiplier(attacker, defenderTypes){
-  // Assume attacker can use a move of each of its own types (STAB). Pick best type advantage.
-  let best = 1; let bestType = attacker.types[0];
-  for (const atk of attacker.types){
-    const mult = effectiveness(atk, defenderTypes) * 1.5; // simple STAB bonus
-    if (mult > best){ best = mult; bestType = atk; }
+    return mult;
   }
-  return {mult: best, type: bestType};
-}
-
-function powerScore(p){
-  // Rough tiebreaker using offensive leaning of base stats
-  const s = p.stats || {atk:0,spa:0,spe:0};
-  return (s.atk + s.spa) * 0.7 + s.spe * 0.3; // heuristic
-}
-
-function rankTeamAgainst(defender){
-  const team = getTeam().map(name=>POKEMON.find(p=>p.name===name)).filter(Boolean);
-  const rows = team.map(p => {
-    const {mult, type} = bestAttackMultiplier(p, defender.types);
-    const score = mult * (1 + powerScore(p)/300); // scale up with stats a bit
-    return {name:p.name, id:p.id, mult, type, score, types:p.types};
-  }).sort((a,b)=>b.score-a.score);
-  return rows;
-}
-
-function setSprite(imgEl, id){
-  const num = String(id).padStart(3,'0');
-  imgEl.src = `sprites/${num}.png`;
-  imgEl.onerror = ()=>{ imgEl.src = ''; imgEl.alt = 'No local sprite'; };
-}
-
-function showPokemon(p){
-  if (!p){ resultEl.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
-  resultEl.classList.remove('hidden'); emptyState.classList.add('hidden');
-  titleEl.textContent = `${p.name} #${String(p.id).padStart(3,'0')}`;
-  typesEl.innerHTML = formatTypes(p.types);
-  setSprite(spriteEl, p.id);
-  const mults = defendMultipliers(p.types);
-  const {weak,res,imm} = listFromMults(mults);
-  weakEl.textContent = weak.join(', ') || '–';
-  resEl.textContent = res.join(', ') || '–';
-  immEl.textContent = (imm.join(', ') || '–');
-  vsName.textContent = p.name;
-  // rankings
-  const rows = rankTeamAgainst(p);
-  renderRankings(rows);
-}
-
-function renderRankings(rows){
-  rankingsEl.innerHTML = '';
-  if (!rows.length){
-    const div = document.createElement('div');
-    div.className = 'hint';
-    div.textContent = 'Add Pokémon to your team to see rankings.';
-    rankingsEl.appendChild(div);
-    return;
+  function defendMultipliers(defendTypes){
+    const out = {};
+    for (const atk of TYPES) out[atk] = effectiveness(atk, defendTypes);
+    return out;
   }
-  rows.forEach((r,i)=>{
-    const el = document.createElement('div');
-    el.className = 'rank-item';
-    el.innerHTML = `<div class="l"><div class="dot" style="opacity:${1 - i*0.2}"></div><div><b>${i+1}. ${r.name}</b><div class="types">${formatTypes(r.types)}</div></div></div><div><span class="pill">Best: ${r.type}</span> <span class="pill">x${r.mult.toFixed(2)}</span> <span class="score">${r.score.toFixed(1)}</span></div>`;
-    rankingsEl.appendChild(el);
-  });
-}
 
-function populateSelectors(){
-  const sorted = [...POKEMON].sort((a,b)=>a.name.localeCompare(b.name));
-  for (const sel of [nameSelect, teamSelect]){
-    sel.innerHTML = '';
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = '— choose —';
-    sel.appendChild(opt0);
-    sorted.forEach(p=>{
-      const o = document.createElement('option');
-      o.value = p.name; o.textContent = p.name; sel.appendChild(o);
+  // ------------------ Minimal Sample Data (fallback) ------------------
+  const SAMPLE_DATA = [
+    {id:1,name:"Bulbasaur",types:["grass","poison"],stats:{hp:45,atk:49,def:49,spa:65,spd:65,spe:45}},
+    {id:4,name:"Charmander",types:["fire"],stats:{hp:39,atk:52,def:43,spa:60,spd:50,spe:65}},
+    {id:6,name:"Charizard",types:["fire","flying"],stats:{hp:78,atk:84,def:78,spa:109,spd:85,spe:100}},
+    {id:7,name:"Squirtle",types:["water"],stats:{hp:44,atk:48,def:65,spa:50,spd:64,spe:43}},
+    {id:25,name:"Pikachu",types:["electric"],stats:{hp:35,atk:55,def:40,spa:50,spd:50,spe:90}},
+    {id:94,name:"Gengar",types:["ghost","poison"],stats:{hp:60,atk:65,def:60,spa:130,spd:75,spe:110}},
+    {id:149,name:"Dragonite",types:["dragon","flying"],stats:{hp:91,atk:134,def:95,spa:100,spd:100,spe:80}},
+    {id:131,name:"Lapras",types:["water","ice"],stats:{hp:130,atk:85,def:80,spa:85,spd:95,spe:60}},
+    {id:143,name:"Snorlax",types:["normal"],stats:{hp:160,atk:110,def:65,spa:65,spd:110,spe:30}},
+    {id:212,name:"Scizor",types:["bug","steel"],stats:{hp:70,atk:130,def:100,spa:55,spd:80,spe:65}}
+  ];
+  let POKEMON = SAMPLE_DATA;
+
+  async function tryLoadExternalData(){
+    try {
+      const res = await fetch('data/pokemon.min.json');
+      if (!res.ok) return;
+      const json = await res.json();
+      if (Array.isArray(json) && json.length) {
+        POKEMON = json;
+        console.log(`Loaded external dataset with ${json.length} Pokémon.`);
+      }
+    } catch(e){ console.warn('Using built-in sample data.', e); }
+  }
+
+  // ------------------ UI Refs ------------------
+  const nameInput  = document.getElementById('nameInput');
+  const nameSelect = document.getElementById('nameSelect');
+  const teamSelect = document.getElementById('teamSelect');
+  const addToTeamBtn = document.getElementById('addToTeamBtn');
+  const teamSlots = document.getElementById('teamSlots');
+  const voiceBtn = document.getElementById('voiceBtn');
+  const voiceLabel = document.getElementById('voiceLabel');
+  const voiceHintEl = document.getElementById('voiceHint');
+  const showBtn = document.getElementById('showBtn');
+  const resultEl = document.getElementById('result');
+  const emptyState = document.getElementById('emptyState');
+  const titleEl = document.getElementById('title');
+  const typesEl = document.getElementById('types');
+  const weakEl = document.getElementById('weakTo');
+  const resEl = document.getElementById('resists');
+  const immEl = document.getElementById('immune');
+  const spriteEl = document.getElementById('sprite');
+  const vsName = document.getElementById('vsName');
+  const rankingsEl = document.getElementById('rankings');
+
+  // ------------------ Helpers ------------------
+  function byName(name){
+    name = (name || '').toString().trim().toLowerCase();
+    if (!name) return null;
+    let p = POKEMON.find(x => x.name.toLowerCase() === name);
+    if (p) return p;
+    p = POKEMON.find(x => x.name.toLowerCase().startsWith(name)) || POKEMON.find(x => x.name.toLowerCase().includes(name));
+    return p || null;
+  }
+  function formatTypes(types){ return types.map(t=>`<span class="type">${t}</span>`).join(''); }
+  function listFromMults(m){
+    const entries = Object.entries(m);
+    const weak = entries.filter(([,v])=>v>1).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`${t}×${v}`);
+    const res = entries.filter(([,v])=>v>0 && v<1).sort((a,b)=>a[1]-b[1]).map(([t,v])=>`${t}×${v}`);
+    const imm = entries.filter(([,v])=>v===0).map(([t])=>t);
+    return {weak, res, imm};
+  }
+  function bestAttackMultiplier(attacker, defenderTypes){
+    let best = 1; let bestType = attacker.types[0];
+    for (const atk of attacker.types){
+      const mult = effectiveness(atk, defenderTypes) * 1.5; // STAB heuristic
+      if (mult > best){ best = mult; bestType = atk; }
+    }
+    return {mult: best, type: bestType};
+  }
+  function powerScore(p){
+    const s = p.stats || {atk:0,spa:0,spe:0};
+    return (s.atk + s.spa) * 0.7 + s.spe * 0.3;
+  }
+  function rankTeamAgainst(defender){
+    const team = getTeam().map(name=>POKEMON.find(p=>p.name===name)).filter(Boolean);
+    return team.map(p => {
+      const {mult, type} = bestAttackMultiplier(p, defender.types);
+      const score = mult * (1 + powerScore(p)/300);
+      return {name:p.name, id:p.id, mult, type, score, types:p.types};
+    }).sort((a,b)=>b.score-a.score);
+  }
+  function setSprite(imgEl, id){
+    const num = String(id).padStart(3,'0');
+    imgEl.src = `sprites/${num}.png`;
+    imgEl.onerror = ()=>{ imgEl.src = ''; imgEl.alt = 'No local sprite'; };
+  }
+
+  // ------------------ Render ------------------
+  function showPokemon(p){
+    if (!p){ resultEl.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
+    resultEl.classList.remove('hidden'); emptyState.classList.add('hidden');
+    titleEl.textContent = `${p.name} #${String(p.id).padStart(3,'0')}`;
+    typesEl.innerHTML = formatTypes(p.types);
+    setSprite(spriteEl, p.id);
+    const mults = defendMultipliers(p.types);
+    const {weak,res,imm} = listFromMults(mults);
+    weakEl.textContent = weak.join(', ') || '–';
+    resEl.textContent = res.join(', ') || '–';
+    immEl.textContent = imm.join(', ') || '–';
+    vsName.textContent = p.name;
+    renderRankings(rankTeamAgainst(p));
+  }
+  function renderRankings(rows){
+    rankingsEl.innerHTML = '';
+    if (!rows.length){
+      const div = document.createElement('div');
+      div.className = 'hint';
+      div.textContent = 'Add Pokémon to your team to see rankings.';
+      rankingsEl.appendChild(div);
+      return;
+    }
+    rows.forEach((r,i)=>{
+      const el = document.createElement('div');
+      el.className = 'rank-item';
+      el.innerHTML = `
+        <div class="l">
+          <div class="dot" style="opacity:${1 - i*0.2}"></div>
+          <div>
+            <b>${i+1}. ${r.name}</b>
+            <div class="types">${formatTypes(r.types)}</div>
+          </div>
+        </div>
+        <div>
+          <span class="pill">Best: ${r.type}</span>
+          <span class="pill">x${r.mult.toFixed(2)}</span>
+          <span class="score">${r.score.toFixed(1)}</span>
+        </div>`;
+      rankingsEl.appendChild(el);
     });
   }
-}
-
-function getTeam(){
-  try { return JSON.parse(localStorage.getItem('team3')||'[]'); } catch{ return []; }
-}
-function setTeam(arr){
-  localStorage.setItem('team3', JSON.stringify(arr.slice(0,3)));
-  renderTeam();
-}
-function renderTeam(){
-  const t = getTeam();
-  teamSlots.innerHTML = '';
-  for (let i=0;i<3;i++){
-    const name = t[i];
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    if (name){
-      const p = POKEMON.find(x=>x.name===name);
-      slot.innerHTML = `<div style="display:flex; align-items:center; gap:8px;">
-        <img alt="" width="40" height="40" style="image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022;" onerror="this.style.opacity=.3" src="sprites/${String(p.id).padStart(3,'0')}.png"/>
-        <div>
-          <b>${p.name}</b>
-          <div class="types">${formatTypes(p.types)}</div>
-        </div>
-        <button style="margin-left: auto; width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
-      </div>`;
-    } else {
-      slot.textContent = 'Empty';
+  function populateSelectors(){
+    const sorted = [...POKEMON].sort((a,b)=>a.name.localeCompare(b.name));
+    for (const sel of [nameSelect, teamSelect]){
+      sel.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— choose —';
+      sel.appendChild(opt0);
+      sorted.forEach(p=>{
+        const o = document.createElement('option');
+        o.value = p.name; o.textContent = p.name; sel.appendChild(o);
+      });
     }
-    teamSlots.appendChild(slot);
   }
-}
-function removeFromTeam(i){
-  const t = getTeam();
-  t.splice(i,1);
-  setTeam(t);
-}
-
-// Voice recognition (Web Speech API)
-let rec; let recActive = false;
-function setupVoice(){
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!R){
-    voiceBtn.disabled = true;
-    voiceBtn.title = 'Speech recognition not supported in this browser';
-    voiceLabel.textContent = 'Not supported';
-    return;
+  function getTeam(){
+    try { return JSON.parse(localStorage.getItem('team3')||'[]'); } catch { return []; }
   }
-  rec = new R();
-  rec.lang = 'en-US';
-  rec.interimResults = false; rec.maxAlternatives = 4;
-  rec.onresult = (e)=>{
-    const alts = [];
-    for (const r of e.results){ for (const a of r){ alts.push(a.transcript); } }
-    // Try exact, then fuzzy for each alt
-    let found = null;
-    for (const t of alts){ found = byName(t); if (found) break; }
-    if (!found){
-      // Try cleaning diacritics / punctuation
-      const cleaned = alts.map(s=>s.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim());
-      for (const t of cleaned){ found = byName(t); if (found) break; }
+  function setTeam(arr){
+    try { localStorage.setItem('team3', JSON.stringify(arr.slice(0,3))); } catch {}
+    renderTeam();
+  }
+  function renderTeam(){
+    const t = getTeam();
+    teamSlots.innerHTML = '';
+    for (let i=0;i<3;i++){
+      const name = t[i];
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      if (name){
+        const p = POKEMON.find(x=>x.name===name);
+        const idp = p ? String(p.id).padStart(3,'0') : '000';
+        slot.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <img alt="" width="40" height="40" style="image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022;" onerror="this.style.opacity=.3" src="sprites/${idp}.png"/>
+            <div>
+              <b>${p ? p.name : name}</b>
+              <div class="types">${p ? formatTypes(p.types) : ''}</div>
+            </div>
+            <button style="margin-left: auto; width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
+          </div>`;
+      } else {
+        slot.textContent = 'Empty';
+      }
+      teamSlots.appendChild(slot);
     }
-    if (found){
-      nameInput.value = found.name; nameSelect.value = found.name;
-      showPokemon(found);
-    } else {
-      alert('Did not catch that name. Try again or type/select.');
+  }
+  function removeFromTeam(i){
+    const t = getTeam();
+    t.splice(i,1);
+    setTeam(t);
+  }
+  window.removeFromTeam = removeFromTeam; // expose for inline onclick
+
+  // ------------------ Voice (Electron disabled) ------------------
+  let rec; let recActive = false;
+  function setupVoice(){
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const isElectron = typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent || '');
+    // Update hint text
+    if (voiceHintEl){
+      voiceHintEl.textContent = isElectron
+        ? 'Voice search is unavailable in the desktop app. Use typing or the dropdown.'
+        : 'Voice tips: Press and hold the mic, say the name (e.g., pikachu), release. Works best in Chrome / Edge.';
     }
+    // Disable if Electron OR unsupported
+    if (isElectron || !R){
+      voiceBtn.disabled = true;
+      voiceBtn.classList.add('disabled');
+      voiceBtn.title = isElectron
+        ? 'Voice search isn’t available in the desktop app'
+        : 'Speech recognition not supported in this browser';
+      voiceLabel.textContent = isElectron ? 'Unavailable in desktop app' : 'Not supported';
+      return;
+    }
+    // Browser speech setup
+    rec = new R();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 4;
+    rec.onresult = (e)=>{
+      const alts = [];
+      for (const r of e.results){ for (const a of r){ alts.push(a.transcript); } }
+      let found = null;
+      for (const t of alts){ found = byName(t); if (found) break; }
+      if (!found){
+        const cleaned = alts.map(s=>s.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim());
+        for (const t of cleaned){ found = byName(t); if (found) break; }
+      }
+      if (found){
+        nameInput.value = found.name; nameSelect.value = found.name;
+        showPokemon(found);
+      } else {
+        alert('Did not catch that name. Try again or type/select.');
+      }
+    };
+    rec.onend = ()=>{
+      recActive=false; voiceLabel.textContent='Hold to speak'; voiceBtn.classList.remove('rec');
+    };
+    const startRec = ()=>{ if (recActive) return; recActive=true; voiceLabel.textContent='Listening…'; voiceBtn.classList.add('rec'); rec.start(); };
+    const stopRec  = ()=>{ if (!recActive) return; rec.stop(); };
+    voiceBtn.onmousedown = startRec;
+    voiceBtn.onmouseup = stopRec;
+    voiceBtn.onmouseleave = stopRec;
+    // Touch support
+    voiceBtn.ontouchstart = (e)=>{ e.preventDefault(); startRec(); };
+    voiceBtn.ontouchend = (e)=>{ e.preventDefault(); stopRec(); };
+  }
+
+  // ------------------ Events ------------------
+  showBtn.onclick = ()=>{
+    const name = nameInput.value || nameSelect.value;
+    const p = byName(name);
+    if (!p){ alert('Pick a valid Pokémon name.'); return; }
+    nameSelect.value = p.name; nameInput.value = p.name;
+    showPokemon(p);
   };
-  rec.onend = ()=>{ recActive=false; voiceLabel.textContent='Hold to speak'; voiceBtn.classList.remove('rec'); };
-  voiceBtn.onmousedown = ()=>{ if (recActive) return; recActive=true; voiceLabel.textContent='Listening…'; voiceBtn.classList.add('rec'); rec.start(); };
-  voiceBtn.onmouseup = ()=>{ if (!recActive) return; rec.stop(); };
-  voiceBtn.onmouseleave = ()=>{ if (recActive) rec.stop(); };
-}
+  nameSelect.onchange = ()=>{
+    const v = nameSelect.value; if (!v) return; nameInput.value = v; const p=byName(v); showPokemon(p);
+  };
+  addToTeamBtn.onclick = ()=>{
+    const sel = teamSelect.value; if (!sel) return;
+    const t = getTeam();
+    if (t.includes(sel)) return alert('Already on team.');
+    if (t.length >= 3) return alert('Team is full (max 3). Remove one first.');
+    t.push(sel); setTeam(t);
+  };
 
-// Events
-showBtn.onclick = ()=>{
-  const name = nameInput.value || nameSelect.value;
-  const p = byName(name);
-  if (!p){ alert('Pick a valid Pokémon name.'); return; }
-  nameSelect.value = p.name; nameInput.value = p.name;
-  showPokemon(p);
-};
-
-nameSelect.onchange = ()=>{
-  const v = nameSelect.value; if (!v) return; nameInput.value = v; const p=byName(v); showPokemon(p);
-};
-
-addToTeamBtn.onclick = ()=>{
-  const sel = teamSelect.value; if (!sel) return;
-  const t = getTeam();
-  if (t.includes(sel)) return alert('Already on team.');
-  if (t.length >= 3) return alert('Team is full (max 3). Remove one first.');
-  t.push(sel); setTeam(t);
-};
-
-// Boot
-(async function(){
-  await tryLoadExternalData();
-  populateSelectors();
-  renderTeam();
-  setupVoice();
-})();
-</script>
+  // ------------------ Boot ------------------
+  (async function(){
+    await tryLoadExternalData();
+    populateSelectors();
+    renderTeam();
+    setupVoice();
+  })();
+  </script>
 </body>
 </html>
