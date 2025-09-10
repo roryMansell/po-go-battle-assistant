@@ -15,6 +15,13 @@ Built with **HTML/CSS/JS**, powered by **local JSON + sprites**, and completely 
 
 ---
 
+## 🌍 Live Demo
+The app can be run entirely in your browser (hosted on GitHub Pages):
+
+👉 [**Open Live Pokédex**](https://roryMansell.github.io/po-go-battle-assistant/)  
+
+> ⚠️ Voice input requires **HTTPS** (works in Chrome/Edge). Desktop builds run fully offline but disable voice search.
+
 ## 🖼️ Screenshots
 ![Screenshot](demoPNG.png)
 ![GIF Demo](demo-gif.gif)
