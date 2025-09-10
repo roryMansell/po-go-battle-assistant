@@ -27,4 +27,10 @@ This is a **static site** (HTML, CSS, JS, JSON). To run it locally:
 ```bash
 cd po-go-battle-assistant
 python -m http.server 8000
+```
+## 🖥️ Download
+Grab the latest [release](https://github.com/roryMansell/po-go-battle-assistant/releases).
 
+1. Download `VoicePokedex-win64.zip`
+2. Extract it somewhere
+3. Double-click `Voice Pokedex.exe`
