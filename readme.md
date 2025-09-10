@@ -28,6 +28,10 @@ This is a **static site** (HTML, CSS, JS, JSON). To run it locally:
 cd po-go-battle-assistant
 python -m http.server 8000
 ```
+Then open:
+
+👉 http://localhost:8000/index.html
+
 ## 🖥️ Download
 
 - [Installer (recommended)](https://github.com/roryMansell/po-go-battle-assistant/releases/latest/download/Voice.Pokedex.Setup.1.0.0.exe)
@@ -36,5 +40,13 @@ python -m http.server 8000
 ## Languages and technologies
 
 Frontend: HTML, CSS, JavaScript (interactive UI, offline data handling, voice input)
+
 Data prep: Python (scripts for JSON + sprite processing)
+
 Desktop packaging: Electron (Node.js ecosystem)
+
+## 📜 License
+
+Data & sprites belong to their respective creators (Pokémon © Nintendo/Game Freak).
+
+This project is for educational and portfolio use only.
