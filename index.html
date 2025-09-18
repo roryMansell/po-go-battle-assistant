@@ -39,6 +39,8 @@
     .rankings { display:grid; gap:10px; }
     .rank-item { background:#0f1734; border:1px solid #2a396b; border-radius:12px; padding:10px; display:flex; align-items:center; justify-content:space-between; }
     .rank-item .l { display:flex; align-items:center; gap:10px; }
+    .rank-item .r { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+    .rank-item .r .top { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
     .dot { width:10px; height:10px; border-radius:50%; background:#6ee7ff; }
     .score { font-variant-numeric: tabular-nums; font-weight:700; }
     .hidden { display:none !important; }
@@ -49,6 +51,10 @@
     footer { max-width:1100px; margin: 0 auto 40px; padding: 0 22px; color: var(--muted); }
     a { color: var(--accent); }
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#0e1530; border:1px solid #2a396b; padding:2px 6px; border-radius:6px; }
+    .team-moves { margin-top:6px; font-size:12px; color: var(--muted); display:flex; flex-direction:column; gap:2px; }
+    .team-moves .label { font-weight:600; color:#e6eefc; margin-right:4px; text-transform:uppercase; letter-spacing:.04em; font-size:11px; }
+    .team-moves.small { font-size:11px; text-align:right; }
+    .team-moves.small .label { font-size:10px; }
     @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -173,6 +179,24 @@
     return out;
   }
 
+  function buildSampleMove(id, name, type, category, power, energy, cooldown){
+    const move = { id, name, type, category, power, energy };
+    if (typeof cooldown === 'number' && cooldown > 0){
+      move.cooldown = Number(cooldown.toFixed(2));
+      move.turns = Number((cooldown / 0.5).toFixed(2));
+      if (typeof power === 'number'){
+        move.dps = Number((power / cooldown).toFixed(2));
+      }
+      if (typeof energy === 'number'){
+        move.eps = Number((energy / cooldown).toFixed(2));
+      }
+    }
+    if (category === 'charged' && typeof power === 'number' && typeof energy === 'number' && energy !== 0){
+      move.dpe = Number((power / Math.abs(energy)).toFixed(2));
+    }
+    return move;
+  }
+
   // ------------------ Minimal Sample Data (fallback) ------------------
   const SAMPLE_DATA = [
     {
@@ -181,7 +205,18 @@
       slug:"bulbasaur",
       types:["grass","poison"],
       stats:{attack:118,defense:111,stamina:128},
-      moves:{fast:["Vine Whip (Fast)","Tackle (Fast)"],charged:["Power Whip","Seed Bomb","Sludge Bomb"]}
+      moves:{
+        fast:[
+          buildSampleMove('VINE_WHIP','Vine Whip (Fast)','grass','fast',5,8,0.6),
+          buildSampleMove('TACKLE','Tackle (Fast)','normal','fast',4,5,0.5)
+        ],
+        charged:[
+          buildSampleMove('POWER_WHIP','Power Whip','grass','charged',90,-50),
+          buildSampleMove('SEED_BOMB','Seed Bomb','grass','charged',60,-45),
+          buildSampleMove('SLUDGE_BOMB','Sludge Bomb','poison','charged',80,-50)
+        ],
+        recommended:{fast:'VINE_WHIP',charged:['POWER_WHIP','SLUDGE_BOMB']}
+      }
     },
     {
       dex:4,
@@ -189,7 +224,18 @@
       slug:"charmander",
       types:["fire"],
       stats:{attack:116,defense:93,stamina:118},
-      moves:{fast:["Ember (Fast)","Scratch (Fast)"],charged:["Flame Burst","Flame Charge","Flamethrower"]}
+      moves:{
+        fast:[
+          buildSampleMove('EMBER','Ember (Fast)','fire','fast',6,6,1.0),
+          buildSampleMove('SCRATCH','Scratch (Fast)','normal','fast',4,2,0.5)
+        ],
+        charged:[
+          buildSampleMove('FLAME_BURST','Flame Burst','fire','charged',70,-50),
+          buildSampleMove('FLAME_CHARGE','Flame Charge','fire','charged',70,-45),
+          buildSampleMove('FLAMETHROWER','Flamethrower','fire','charged',90,-55)
+        ],
+        recommended:{fast:'EMBER',charged:['FLAME_CHARGE','FLAMETHROWER']}
+      }
     },
     {
       dex:6,
@@ -197,7 +243,18 @@
       slug:"charizard",
       types:["fire","flying"],
       stats:{attack:223,defense:173,stamina:186},
-      moves:{fast:["Air Slash (Fast)","Fire Spin (Fast)"],charged:["Blast Burn","Dragon Claw","Overheat"]}
+      moves:{
+        fast:[
+          buildSampleMove('AIR_SLASH','Air Slash (Fast)','flying','fast',9,9,1.2),
+          buildSampleMove('FIRE_SPIN','Fire Spin (Fast)','fire','fast',9,10,1.1)
+        ],
+        charged:[
+          buildSampleMove('BLAST_BURN','Blast Burn','fire','charged',110,-50),
+          buildSampleMove('DRAGON_CLAW','Dragon Claw','dragon','charged',50,-35),
+          buildSampleMove('OVERHEAT','Overheat','fire','charged',160,-65)
+        ],
+        recommended:{fast:'FIRE_SPIN',charged:['BLAST_BURN','DRAGON_CLAW']}
+      }
     },
     {
       dex:7,
@@ -205,7 +262,18 @@
       slug:"squirtle",
       types:["water"],
       stats:{attack:94,defense:121,stamina:127},
-      moves:{fast:["Bubble (Fast)","Tackle (Fast)"],charged:["Aqua Jet","Aqua Tail","Water Pulse"]}
+      moves:{
+        fast:[
+          buildSampleMove('BUBBLE','Bubble (Fast)','water','fast',7,11,1.2),
+          buildSampleMove('TACKLE','Tackle (Fast)','normal','fast',4,5,0.5)
+        ],
+        charged:[
+          buildSampleMove('AQUA_JET','Aqua Jet','water','charged',45,-45),
+          buildSampleMove('AQUA_TAIL','Aqua Tail','water','charged',50,-35),
+          buildSampleMove('WATER_PULSE','Water Pulse','water','charged',70,-60)
+        ],
+        recommended:{fast:'BUBBLE',charged:['AQUA_TAIL','AQUA_JET']}
+      }
     },
     {
       dex:25,
@@ -213,7 +281,18 @@
       slug:"pikachu",
       types:["electric"],
       stats:{attack:112,defense:96,stamina:111},
-      moves:{fast:["Quick Attack (Fast)","Thunder Shock (Fast)"],charged:["Discharge","Thunder","Wild Charge"]}
+      moves:{
+        fast:[
+          buildSampleMove('QUICK_ATTACK','Quick Attack (Fast)','normal','fast',5,8,0.8),
+          buildSampleMove('THUNDER_SHOCK','Thunder Shock (Fast)','electric','fast',3,9,0.6)
+        ],
+        charged:[
+          buildSampleMove('DISCHARGE','Discharge','electric','charged',65,-45),
+          buildSampleMove('THUNDER','Thunder','electric','charged',100,-60),
+          buildSampleMove('WILD_CHARGE','Wild Charge','electric','charged',100,-45)
+        ],
+        recommended:{fast:'THUNDER_SHOCK',charged:['WILD_CHARGE','THUNDER']}
+      }
     },
     {
       dex:94,
@@ -221,7 +300,18 @@
       slug:"gengar",
       types:["ghost","poison"],
       stats:{attack:261,defense:149,stamina:155},
-      moves:{fast:["Hex (Fast)","Sucker Punch (Fast)"],charged:["Shadow Ball","Shadow Punch","Sludge Bomb"]}
+      moves:{
+        fast:[
+          buildSampleMove('HEX','Hex (Fast)','ghost','fast',8,12,1.0),
+          buildSampleMove('SUCKER_PUNCH','Sucker Punch (Fast)','dark','fast',7,8,1.5)
+        ],
+        charged:[
+          buildSampleMove('SHADOW_BALL','Shadow Ball','ghost','charged',100,-55),
+          buildSampleMove('SHADOW_PUNCH','Shadow Punch','ghost','charged',55,-35),
+          buildSampleMove('SLUDGE_BOMB','Sludge Bomb','poison','charged',80,-50)
+        ],
+        recommended:{fast:'HEX',charged:['SHADOW_BALL','SHADOW_PUNCH']}
+      }
     },
     {
       dex:149,
@@ -229,7 +319,18 @@
       slug:"dragonite",
       types:["dragon","flying"],
       stats:{attack:263,defense:198,stamina:209},
-      moves:{fast:["Dragon Breath (Fast)","Steel Wing (Fast)"],charged:["Dragon Claw","Dragon Pulse","Hurricane"]}
+      moves:{
+        fast:[
+          buildSampleMove('DRAGON_BREATH','Dragon Breath (Fast)','dragon','fast',4,3,0.5),
+          buildSampleMove('STEEL_WING','Steel Wing (Fast)','steel','fast',11,6,1.4)
+        ],
+        charged:[
+          buildSampleMove('DRAGON_CLAW','Dragon Claw','dragon','charged',50,-35),
+          buildSampleMove('DRAGON_PULSE','Dragon Pulse','dragon','charged',90,-60),
+          buildSampleMove('HURRICANE','Hurricane','flying','charged',110,-65)
+        ],
+        recommended:{fast:'DRAGON_BREATH',charged:['DRAGON_CLAW','HURRICANE']}
+      }
     },
     {
       dex:131,
@@ -237,7 +338,18 @@
       slug:"lapras",
       types:["water","ice"],
       stats:{attack:165,defense:174,stamina:277},
-      moves:{fast:["Frost Breath (Fast)","Water Gun (Fast)"],charged:["Blizzard","Ice Beam","Surf"]}
+      moves:{
+        fast:[
+          buildSampleMove('FROST_BREATH','Frost Breath (Fast)','ice','fast',10,8,1.1),
+          buildSampleMove('WATER_GUN','Water Gun (Fast)','water','fast',5,5,0.5)
+        ],
+        charged:[
+          buildSampleMove('BLIZZARD','Blizzard','ice','charged',130,-75),
+          buildSampleMove('ICE_BEAM','Ice Beam','ice','charged',90,-55),
+          buildSampleMove('SURF','Surf','water','charged',65,-40)
+        ],
+        recommended:{fast:'WATER_GUN',charged:['SURF','ICE_BEAM']}
+      }
     },
     {
       dex:143,
@@ -245,7 +357,18 @@
       slug:"snorlax",
       types:["normal"],
       stats:{attack:190,defense:169,stamina:330},
-      moves:{fast:["Lick (Fast)","Zen Headbutt (Fast)"],charged:["Body Slam","Earthquake","Hyper Beam"]}
+      moves:{
+        fast:[
+          buildSampleMove('LICK','Lick (Fast)','ghost','fast',4,3,0.5),
+          buildSampleMove('ZEN_HEADBUTT','Zen Headbutt (Fast)','psychic','fast',11,9,1.1)
+        ],
+        charged:[
+          buildSampleMove('BODY_SLAM','Body Slam','normal','charged',60,-35),
+          buildSampleMove('EARTHQUAKE','Earthquake','ground','charged',120,-65),
+          buildSampleMove('HYPER_BEAM','Hyper Beam','normal','charged',150,-80)
+        ],
+        recommended:{fast:'LICK',charged:['BODY_SLAM','EARTHQUAKE']}
+      }
     },
     {
       dex:212,
@@ -253,7 +376,18 @@
       slug:"scizor",
       types:["bug","steel"],
       stats:{attack:236,defense:181,stamina:172},
-      moves:{fast:["Bullet Punch (Fast)","Fury Cutter (Fast)"],charged:["Iron Head","Night Slash","X-Scissor"]}
+      moves:{
+        fast:[
+          buildSampleMove('BULLET_PUNCH','Bullet Punch (Fast)','steel','fast',9,7,1.0),
+          buildSampleMove('FURY_CUTTER','Fury Cutter (Fast)','bug','fast',3,6,0.4)
+        ],
+        charged:[
+          buildSampleMove('IRON_HEAD','Iron Head','steel','charged',70,-50),
+          buildSampleMove('NIGHT_SLASH','Night Slash','dark','charged',50,-35),
+          buildSampleMove('X_SCISSOR','X-Scissor','bug','charged',45,-35)
+        ],
+        recommended:{fast:'BULLET_PUNCH',charged:['NIGHT_SLASH','IRON_HEAD']}
+      }
     }
   ];
   let POKEMON = SAMPLE_DATA;
@@ -311,25 +445,117 @@
     const imm = entries.filter(([,v])=>v===0).map(([t])=>t);
     return {weak, res, imm};
   }
-  function bestAttackMultiplier(attacker, defenderTypes){
-    let best = 1; let bestType = attacker.types[0];
-    for (const atk of attacker.types){
-      const mult = effectiveness(atk, defenderTypes) * 1.5; // STAB heuristic
-      if (mult > best){ best = mult; bestType = atk; }
+  function normalizeMove(move){
+    if (!move) return null;
+    if (typeof move === 'string'){ return { id: move, name: move, category: 'unknown' }; }
+    const copy = {...move};
+    if (copy.id) copy.id = String(copy.id);
+    if (copy.name) copy.name = String(copy.name);
+    if (copy.type) copy.type = String(copy.type).toLowerCase();
+    if (!copy.id && copy.name){ copy.id = copy.name.toUpperCase().replace(/[^A-Z0-9]+/g,'_'); }
+    return copy;
+  }
+  function getMoveCache(p){
+    if (!p) return {fast:[], charged:[]};
+    if (!p._moveCache){
+      const fast = (p.moves?.fast || []).map(normalizeMove).filter(Boolean);
+      const charged = (p.moves?.charged || []).map(normalizeMove).filter(Boolean);
+      p._moveCache = {fast, charged};
     }
-    return {mult: best, type: bestType};
+    return p._moveCache;
+  }
+  function describeMove(move){
+    if (!move) return '–';
+    const name = typeof move === 'string' ? move : (move.name || move.id || 'Unknown move');
+    const type = typeof move === 'object' && move?.type ? move.type : '';
+    return type ? `${name} · ${type}` : name;
+  }
+  function findMove(moves, key){
+    if (!key) return null;
+    const raw = String(key);
+    const upper = raw.toUpperCase();
+    for (const m of moves){
+      if (m.id && (m.id === raw || m.id === upper)) return m;
+    }
+    const lower = raw.toLowerCase();
+    return moves.find(m => (m.name && m.name.toLowerCase() === lower)) || null;
+  }
+  function getRecommendedMoveset(p){
+    const pool = getMoveCache(p);
+    const rec = p.moves?.recommended || {};
+    let fast = null;
+    if (rec.fast) fast = findMove(pool.fast, rec.fast);
+    if (!fast) fast = pool.fast[0] || null;
+    let charged = [];
+    if (Array.isArray(rec.charged)){
+      charged = rec.charged.map(id=>findMove(pool.charged, id)).filter(Boolean);
+    }
+    if (!charged.length) charged = pool.charged.slice(0,2);
+    return {fast, charged, pool};
   }
   function powerScore(p){
     const s = p.stats || {};
     return (s.attack || 0) * 0.6 + (s.defense || 0) * 0.25 + (s.stamina || 0) * 0.15;
   }
+  function stabBonus(attacker, moveType){
+    return moveType && attacker.types?.includes(moveType) ? 1.2 : 1;
+  }
+  function moveMultiplier(moveType, defenderTypes){
+    return moveType ? effectiveness(moveType, defenderTypes) : 1;
+  }
+  function scoreFastMove(move, attacker, defenderTypes){
+    if (!move) return {score:0.5, mult:1, move:null};
+    const mult = moveMultiplier(move.type, defenderTypes) * stabBonus(attacker, move.type);
+    const cooldown = typeof move.cooldown === 'number' ? move.cooldown : (typeof move.cooldown_s === 'number' ? move.cooldown_s : null);
+    let dps = typeof move.dps === 'number' ? move.dps : null;
+    if (!dps && typeof move.power === 'number' && cooldown){ dps = move.power / cooldown; }
+    if (!dps) dps = typeof move.power === 'number' ? move.power : 1;
+    let eps = typeof move.eps === 'number' ? move.eps : null;
+    if (!eps && typeof move.energy === 'number' && cooldown){ eps = move.energy / cooldown; }
+    if (!eps) eps = typeof move.energy === 'number' ? move.energy : 0;
+    const pressure = dps * 0.65 + eps * 0.35;
+    return {score: pressure * mult, mult, move};
+  }
+  function scoreChargedMove(move, attacker, defenderTypes){
+    if (!move) return {score:0.5, mult:1, move:null};
+    const mult = moveMultiplier(move.type, defenderTypes) * stabBonus(attacker, move.type);
+    const energyCost = Math.max(10, Math.abs(move.energy || 50));
+    let dpe = typeof move.dpe === 'number' ? move.dpe : null;
+    if (!dpe && typeof move.power === 'number'){ dpe = move.power / energyCost; }
+    const powerBonus = 1 + (move.power || 0) / 200;
+    const speedBonus = 1 + 40 / Math.max(35, energyCost);
+    return {score: dpe * mult * powerBonus * speedBonus, mult, move};
+  }
+  function evaluatePokemonAgainst(attacker, defender){
+    const {fast, charged} = getRecommendedMoveset(attacker);
+    const defenderTypes = defender.types || [];
+    const fastResult = scoreFastMove(fast, attacker, defenderTypes);
+    const chargedResults = charged.map(m=>scoreChargedMove(m, attacker, defenderTypes));
+    const bestCharged = chargedResults.sort((a,b)=>b.score-a.score)[0] || null;
+    const coverage = new Set();
+    if (fast?.type) coverage.add(fast.type);
+    charged.forEach(m=>{ if (m?.type) coverage.add(m.type); });
+    const coverageBonus = 1 + coverage.size * 0.03;
+    const bulkBonus = 1 + powerScore(attacker)/400;
+    const fastScore = fastResult.score;
+    const chargedScore = bestCharged ? bestCharged.score : fastScore;
+    const combined = (fastScore * 0.45 + chargedScore * 0.55) * coverageBonus * bulkBonus;
+    const bestResult = !bestCharged || fastResult.score >= bestCharged.score ? fastResult : bestCharged;
+    return {
+      name: attacker.name,
+      dex: attacker.dex,
+      score: combined,
+      mult: bestResult?.mult || 1,
+      bestMove: bestResult?.move || null,
+      bestMoveKind: bestResult === fastResult ? 'fast' : 'charged',
+      fastMove: fast,
+      chargedMoves: charged,
+      types: attacker.types || [],
+    };
+  }
   function rankTeamAgainst(defender){
     const team = getTeam().map(name=>POKEMON.find(p=>p.name===name)).filter(Boolean);
-    return team.map(p => {
-      const {mult, type} = bestAttackMultiplier(p, defender.types);
-      const score = mult * (1 + powerScore(p)/300);
-      return {name:p.name, dex:p.dex, mult, type, score, types:p.types};
-    }).sort((a,b)=>b.score-a.score);
+    return team.map(p => evaluatePokemonAgainst(p, defender)).sort((a,b)=>b.score-a.score);
   }
   function setSprite(imgEl, dex){
     const num = String(dex).padStart(3,'0');
@@ -338,7 +564,7 @@
   }
   function renderMoves(el, moves){
     if (!moves || !moves.length){ el.innerHTML = '–'; return; }
-    el.innerHTML = moves.map(m=>`<span>${m}</span>`).join('');
+    el.innerHTML = moves.map(m=>`<span>${describeMove(m)}</span>`).join('');
   }
 
   // ------------------ Render ------------------
@@ -355,8 +581,9 @@
     immEl.textContent = imm.join(', ') || '–';
     const stats = p.stats || {};
     statsEl.textContent = stats.attack ? `ATK ${stats.attack} · DEF ${stats.defense} · STA ${stats.stamina}` : '–';
-    renderMoves(fastMovesEl, p.moves?.fast || []);
-    renderMoves(chargedMovesEl, p.moves?.charged || []);
+    const movePool = getMoveCache(p);
+    renderMoves(fastMovesEl, movePool.fast);
+    renderMoves(chargedMovesEl, movePool.charged);
     vsName.textContent = p.name;
     renderRankings(rankTeamAgainst(p));
   }
@@ -372,6 +599,10 @@
     rows.forEach((r,i)=>{
       const el = document.createElement('div');
       el.className = 'rank-item';
+      const bestLabel = r.bestMoveKind === 'charged' ? 'Best charged' : 'Best fast';
+      const bestMoveText = describeMove(r.bestMove);
+      const fastText = describeMove(r.fastMove);
+      const chargedText = (r.chargedMoves && r.chargedMoves.length) ? r.chargedMoves.map(describeMove).join(', ') : '–';
       el.innerHTML = `
         <div class="l">
           <div class="dot" style="opacity:${1 - i*0.2}"></div>
@@ -380,10 +611,16 @@
             <div class="types">${formatTypes(r.types)}</div>
           </div>
         </div>
-        <div>
-          <span class="pill">Best: ${r.type}</span>
-          <span class="pill">x${r.mult.toFixed(2)}</span>
-          <span class="score">${r.score.toFixed(1)}</span>
+        <div class="r">
+          <div class="top">
+            <span class="pill">${bestLabel}: ${bestMoveText}</span>
+            <span class="pill">x${r.mult.toFixed(2)}</span>
+            <span class="score">${r.score.toFixed(1)}</span>
+          </div>
+          <div class="team-moves small">
+            <div><span class="label">Fast</span>${fastText}</div>
+            <div><span class="label">Charged</span>${chargedText}</div>
+          </div>
         </div>`;
       rankingsEl.appendChild(el);
     });
@@ -419,12 +656,20 @@
       if (name){
         const p = POKEMON.find(x=>x.name===name);
         const idp = p ? String(p.dex).padStart(3,'0') : '000';
+        const moveset = p ? getRecommendedMoveset(p) : {fast:null, charged:[]};
+        const fastText = p ? describeMove(moveset.fast) : '–';
+        const chargedText = p ? (moveset.charged.length ? moveset.charged.map(describeMove).join(', ') : '–') : '–';
+        const typeHtml = p ? formatTypes(p.types) : '';
         slot.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:flex-start; gap:8px;">
             <img alt="" width="40" height="40" style="image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022;" onerror="this.style.opacity=.3" src="sprites/${idp}.png"/>
-            <div>
+            <div style="flex:1;">
               <b>${p ? p.name : name}</b>
-              <div class="types">${p ? formatTypes(p.types) : ''}</div>
+              <div class="types">${typeHtml}</div>
+              <div class="team-moves">
+                <div><span class="label">Fast</span>${fastText}</div>
+                <div><span class="label">Charged</span>${chargedText}</div>
+              </div>
             </div>
             <button style="margin-left: auto; width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
           </div>`;

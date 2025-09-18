@@ -28,6 +28,12 @@ from typing import Dict, Iterable, List, Optional
 
 GM_URL = "https://raw.githubusercontent.com/PokeMiners/game_masters/master/latest/latest.json"
 MOVE_URL = "https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-json-pokedex/master/output/move.json"
+PVP_RANKING_URLS = [
+    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-1500.json",
+    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-2500.json",
+    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json",
+    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-500.json",
+]
 DEFAULT_OUT = Path("data/pokemon.min.json")
 
 
@@ -138,37 +144,165 @@ def type_name(enum_value: Optional[str]) -> Optional[str]:
     return enum_value.replace("POKEMON_TYPE_", "").replace("_", " ").lower()
 
 
-def move_name(move_id: str, move_map: Dict[str, str]) -> str:
+def move_name(move_id: str, move_map: Dict[str, Dict[str, object]]) -> str:
     if not isinstance(move_id, str):
         move_id = str(move_id)
-    name = move_map.get(move_id)
-    if name:
-        name = name.strip()
-        # The upstream dataset appends "Fast" to quick moves; keep the word but
-        # add parentheses for clarity.
-        if name.endswith(" Fast"):
-            return f"{name[:-5]} (Fast)"
-        return name
+    info = move_map.get(move_id)
+    if info:
+        name = str(info.get("name") or "").strip()
+        if name:
+            return name
     # Fallback: turn the identifier into something readable.
     cleaned = move_id.replace("_FAST", "").replace("_", " ").title()
     return cleaned.replace("Hp", "HP").replace("Cp", "CP")
 
 
-def load_move_map() -> Dict[str, str]:
+def load_move_map() -> Dict[str, Dict[str, object]]:
     data = load_json(MOVE_URL)
-    out: Dict[str, str] = {}
+    out: Dict[str, Dict[str, object]] = {}
     for entry in data:
         mid = entry.get("id")
-        name = entry.get("name")
-        if mid and name:
-            out[mid] = name
-    log(f"Loaded {len(out)} move names")
+        if not mid:
+            continue
+        raw_name = (entry.get("name") or "").strip()
+        energy = int(entry.get("energyDelta") or 0)
+        duration_ms = int(entry.get("durationMs") or 0)
+        power = int(entry.get("power") or 0)
+        cooldown_s = duration_ms / 1000 if duration_ms else None
+        turns = duration_ms / 500 if duration_ms else None
+        category = "fast" if energy > 0 else "charged"
+        move_type = type_name((entry.get("pokemonType") or {}).get("name"))
+        name = raw_name or mid.replace("_", " ").title()
+        if category == "fast":
+            if name.endswith(" Fast"):
+                name = name[:-5]
+            if not name.endswith("(Fast)"):
+                name = f"{name} (Fast)"
+        dps = power / cooldown_s if cooldown_s else None
+        eps = energy / cooldown_s if cooldown_s else None
+        dpe = power / abs(energy) if energy and category == "charged" else None
+        out[mid] = {
+            "id": mid,
+            "name": name,
+            "type": move_type,
+            "power": power,
+            "energy": energy,
+            "duration_ms": duration_ms,
+            "cooldown_s": cooldown_s,
+            "turns": turns,
+            "category": category,
+            "dps": dps,
+            "eps": eps,
+            "dpe": dpe,
+        }
+    log(f"Loaded {len(out)} move definitions")
     return out
 
 
-def build(dataset: Iterable, move_map: Dict[str, str], pokedex_map: Dict[int, str]) -> List[Dict]:
+def load_pvpoke_movesets() -> Dict[str, Dict[str, List[str]]]:
+    """Fetch recommended movesets from PvPoke rankings."""
+
+    combos: Dict[str, Dict[str, List[str]]] = {}
+    for url in PVP_RANKING_URLS:
+        try:
+            rows = load_json(url)
+        except Exception as exc:  # pragma: no cover - network failure fallback
+            log(f"Warning: could not load {url}: {exc}")
+            continue
+        added = 0
+        for row in rows or []:
+            species_id = row.get("speciesId")
+            moveset = row.get("moveset")
+            if not species_id or not moveset or len(moveset) < 3:
+                continue
+            slug = species_id.replace("_", "-")
+            if slug in combos:
+                continue
+            combos[slug] = {
+                "fast": [moveset[0]],
+                "charged": list(moveset[1:3]),
+            }
+            added += 1
+        log(f"Loaded {added} PvPoke movesets from {url}")
+    return combos
+
+
+def build(
+    dataset: Iterable,
+    move_map: Dict[str, Dict[str, object]],
+    pokedex_map: Dict[int, str],
+    recommended_map: Dict[str, Dict[str, List[str]]],
+) -> List[Dict]:
     output: List[Dict] = []
     seen: set = set()
+
+    def format_moves(move_ids: Iterable[str]) -> List[OrderedDict]:
+        seen_ids: set = set()
+        entries: List[OrderedDict] = []
+        for mid in move_ids:
+            if not mid or mid in seen_ids:
+                continue
+            seen_ids.add(mid)
+            info = move_map.get(mid)
+            if info:
+                entry = OrderedDict(
+                    {
+                        "id": info["id"],
+                        "name": info["name"],
+                        "type": info.get("type"),
+                        "category": info.get("category"),
+                        "power": info.get("power"),
+                        "energy": info.get("energy"),
+                    }
+                )
+                if info.get("cooldown_s") is not None:
+                    entry["cooldown"] = round(info["cooldown_s"], 2)
+                if info.get("turns") is not None:
+                    entry["turns"] = round(info["turns"], 2)
+                if info.get("dps") is not None:
+                    entry["dps"] = round(info["dps"], 2)
+                if info.get("eps") is not None:
+                    entry["eps"] = round(info["eps"], 2)
+                if info.get("dpe") is not None:
+                    entry["dpe"] = round(info["dpe"], 2)
+            else:
+                entry = OrderedDict({"id": mid, "name": move_name(mid, move_map)})
+            entries.append(entry)
+        entries.sort(key=lambda row: row.get("name", ""))
+        return entries
+
+    def match_ids(moves: List[OrderedDict], candidates: Iterable[str]) -> Optional[List[str]]:
+        resolved: List[str] = []
+        for cand in candidates:
+            if not cand:
+                continue
+            target = str(cand).upper()
+            for mv in moves:
+                mid = str(mv.get("id") or "").upper()
+                if not mid:
+                    continue
+                normalized = mid.replace("_FAST", "")
+                if mid == target or normalized == target or f"{target}_FAST" == mid:
+                    resolved.append(mv.get("id"))
+                    break
+        return resolved or None
+
+    def find_recommended(slug: str, fast_list: List[OrderedDict], charged_list: List[OrderedDict]) -> Optional[Dict[str, object]]:
+        rec = recommended_map.get(slug)
+        if not rec:
+            return None
+        out: Dict[str, object] = {}
+        fast_candidates = rec.get("fast", [])
+        charged_candidates = rec.get("charged", [])
+        if fast_candidates:
+            fast_matches = match_ids(fast_list, fast_candidates)
+            if fast_matches:
+                out["fast"] = fast_matches[0]
+        if charged_candidates:
+            charged_matches = match_ids(charged_list, charged_candidates)
+            if charged_matches:
+                out["charged"] = charged_matches
+        return out or None
 
     def add_entry(
         dex: int,
@@ -187,21 +321,28 @@ def build(dataset: Iterable, move_map: Dict[str, str], pokedex_map: Dict[int, st
             return
         seen.add(unique_key)
         name = base_name if not label else f"{base_name} ({label})"
+        slug = slugify(name)
+        fast_list = format_moves(fast_moves)
+        charged_list = format_moves(charged_moves)
+        moves = OrderedDict({
+            "fast": fast_list,
+            "charged": charged_list,
+        })
+        recommended = find_recommended(slug, fast_list, charged_list)
+        if recommended:
+            moves["recommended"] = recommended
         entry = OrderedDict(
             {
                 "dex": dex,
                 "name": name,
-                "slug": slugify(name),
+                "slug": slug,
                 "types": [t for t in types if t],
                 "stats": {
                     "attack": stats.get("baseAttack", 0),
                     "defense": stats.get("baseDefense", 0),
                     "stamina": stats.get("baseStamina", 0),
                 },
-                "moves": {
-                    "fast": sorted({move_name(m, move_map) for m in fast_moves if m}),
-                    "charged": sorted({move_name(m, move_map) for m in charged_moves if m}),
-                },
+                "moves": moves,
             }
         )
         output.append(entry)
@@ -274,8 +415,9 @@ def main() -> None:
     dataset = load_json(src)
     move_map = load_move_map()
     pokedex_map = load_pokedex_names()
+    recommended_map = load_pvpoke_movesets()
 
-    entries = build(dataset, move_map, pokedex_map)
+    entries = build(dataset, move_map, pokedex_map, recommended_map)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as fh:
