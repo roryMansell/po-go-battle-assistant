@@ -25,10 +25,15 @@
     .result { display:grid; grid-template-columns: 120px 1fr; gap:16px; }
     .sprite { width: 110px; height:110px; image-rendering: pixelated; background:#0b1020; border:1px solid #27345f; border-radius: 14px; display:grid; place-items:center; }
     .grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:10px; }
+    .grid.two { grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+    .info-grid { grid-auto-rows: auto; }
     .stat { background:#0f1734; border:1px solid #2a396b; border-radius:10px; padding:10px; }
     .stat b { font-size: 18px; }
     .weak { color: var(--bad); }
     .res { color: var(--good); }
+    .moves-list { display:flex; flex-direction:column; gap:4px; font-size:13px; line-height:1.3; }
+    .moves-list span { background:#0b132b; border-radius:6px; padding:4px 6px; border:1px solid #1e294f; }
+    .statline { margin-top:6px; font-size:13px; color: var(--muted); }
     .team { display: grid; grid-template-columns: 1fr; gap: 10px; }
     .team .slot { width: 100%; }
     .rankings { display:grid; gap:10px; }
@@ -107,6 +112,11 @@
               <div class="stat"><div>Resists</div><b class="res" id="resists">–</b></div>
               <div class="stat"><div>Immune to</div><b id="immune">–</b></div>
             </div>
+            <div style="margin-top:10px;" class="grid two info-grid">
+              <div class="stat"><div>GO Stats</div><div id="goStats" class="statline">–</div></div>
+              <div class="stat"><div>Fast attacks</div><div class="moves-list" id="fastMoves">–</div></div>
+              <div class="stat"><div>Charged attacks</div><div class="moves-list" id="chargedMoves">–</div></div>
+            </div>
           </div>
         </div>
         <h3 style="margin:16px 0 6px 0">My Team vs <span id="vsName"></span></h3>
@@ -165,16 +175,86 @@
 
   // ------------------ Minimal Sample Data (fallback) ------------------
   const SAMPLE_DATA = [
-    {id:1,name:"Bulbasaur",types:["grass","poison"],stats:{hp:45,atk:49,def:49,spa:65,spd:65,spe:45}},
-    {id:4,name:"Charmander",types:["fire"],stats:{hp:39,atk:52,def:43,spa:60,spd:50,spe:65}},
-    {id:6,name:"Charizard",types:["fire","flying"],stats:{hp:78,atk:84,def:78,spa:109,spd:85,spe:100}},
-    {id:7,name:"Squirtle",types:["water"],stats:{hp:44,atk:48,def:65,spa:50,spd:64,spe:43}},
-    {id:25,name:"Pikachu",types:["electric"],stats:{hp:35,atk:55,def:40,spa:50,spd:50,spe:90}},
-    {id:94,name:"Gengar",types:["ghost","poison"],stats:{hp:60,atk:65,def:60,spa:130,spd:75,spe:110}},
-    {id:149,name:"Dragonite",types:["dragon","flying"],stats:{hp:91,atk:134,def:95,spa:100,spd:100,spe:80}},
-    {id:131,name:"Lapras",types:["water","ice"],stats:{hp:130,atk:85,def:80,spa:85,spd:95,spe:60}},
-    {id:143,name:"Snorlax",types:["normal"],stats:{hp:160,atk:110,def:65,spa:65,spd:110,spe:30}},
-    {id:212,name:"Scizor",types:["bug","steel"],stats:{hp:70,atk:130,def:100,spa:55,spd:80,spe:65}}
+    {
+      dex:1,
+      name:"Bulbasaur",
+      slug:"bulbasaur",
+      types:["grass","poison"],
+      stats:{attack:118,defense:111,stamina:128},
+      moves:{fast:["Vine Whip (Fast)","Tackle (Fast)"],charged:["Power Whip","Seed Bomb","Sludge Bomb"]}
+    },
+    {
+      dex:4,
+      name:"Charmander",
+      slug:"charmander",
+      types:["fire"],
+      stats:{attack:116,defense:93,stamina:118},
+      moves:{fast:["Ember (Fast)","Scratch (Fast)"],charged:["Flame Burst","Flame Charge","Flamethrower"]}
+    },
+    {
+      dex:6,
+      name:"Charizard",
+      slug:"charizard",
+      types:["fire","flying"],
+      stats:{attack:223,defense:173,stamina:186},
+      moves:{fast:["Air Slash (Fast)","Fire Spin (Fast)"],charged:["Blast Burn","Dragon Claw","Overheat"]}
+    },
+    {
+      dex:7,
+      name:"Squirtle",
+      slug:"squirtle",
+      types:["water"],
+      stats:{attack:94,defense:121,stamina:127},
+      moves:{fast:["Bubble (Fast)","Tackle (Fast)"],charged:["Aqua Jet","Aqua Tail","Water Pulse"]}
+    },
+    {
+      dex:25,
+      name:"Pikachu",
+      slug:"pikachu",
+      types:["electric"],
+      stats:{attack:112,defense:96,stamina:111},
+      moves:{fast:["Quick Attack (Fast)","Thunder Shock (Fast)"],charged:["Discharge","Thunder","Wild Charge"]}
+    },
+    {
+      dex:94,
+      name:"Gengar",
+      slug:"gengar",
+      types:["ghost","poison"],
+      stats:{attack:261,defense:149,stamina:155},
+      moves:{fast:["Hex (Fast)","Sucker Punch (Fast)"],charged:["Shadow Ball","Shadow Punch","Sludge Bomb"]}
+    },
+    {
+      dex:149,
+      name:"Dragonite",
+      slug:"dragonite",
+      types:["dragon","flying"],
+      stats:{attack:263,defense:198,stamina:209},
+      moves:{fast:["Dragon Breath (Fast)","Steel Wing (Fast)"],charged:["Dragon Claw","Dragon Pulse","Hurricane"]}
+    },
+    {
+      dex:131,
+      name:"Lapras",
+      slug:"lapras",
+      types:["water","ice"],
+      stats:{attack:165,defense:174,stamina:277},
+      moves:{fast:["Frost Breath (Fast)","Water Gun (Fast)"],charged:["Blizzard","Ice Beam","Surf"]}
+    },
+    {
+      dex:143,
+      name:"Snorlax",
+      slug:"snorlax",
+      types:["normal"],
+      stats:{attack:190,defense:169,stamina:330},
+      moves:{fast:["Lick (Fast)","Zen Headbutt (Fast)"],charged:["Body Slam","Earthquake","Hyper Beam"]}
+    },
+    {
+      dex:212,
+      name:"Scizor",
+      slug:"scizor",
+      types:["bug","steel"],
+      stats:{attack:236,defense:181,stamina:172},
+      moves:{fast:["Bullet Punch (Fast)","Fury Cutter (Fast)"],charged:["Iron Head","Night Slash","X-Scissor"]}
+    }
   ];
   let POKEMON = SAMPLE_DATA;
 
@@ -207,6 +287,9 @@
   const weakEl = document.getElementById('weakTo');
   const resEl = document.getElementById('resists');
   const immEl = document.getElementById('immune');
+  const fastMovesEl = document.getElementById('fastMoves');
+  const chargedMovesEl = document.getElementById('chargedMoves');
+  const statsEl = document.getElementById('goStats');
   const spriteEl = document.getElementById('sprite');
   const vsName = document.getElementById('vsName');
   const rankingsEl = document.getElementById('rankings');
@@ -237,35 +320,43 @@
     return {mult: best, type: bestType};
   }
   function powerScore(p){
-    const s = p.stats || {atk:0,spa:0,spe:0};
-    return (s.atk + s.spa) * 0.7 + s.spe * 0.3;
+    const s = p.stats || {};
+    return (s.attack || 0) * 0.6 + (s.defense || 0) * 0.25 + (s.stamina || 0) * 0.15;
   }
   function rankTeamAgainst(defender){
     const team = getTeam().map(name=>POKEMON.find(p=>p.name===name)).filter(Boolean);
     return team.map(p => {
       const {mult, type} = bestAttackMultiplier(p, defender.types);
       const score = mult * (1 + powerScore(p)/300);
-      return {name:p.name, id:p.id, mult, type, score, types:p.types};
+      return {name:p.name, dex:p.dex, mult, type, score, types:p.types};
     }).sort((a,b)=>b.score-a.score);
   }
-  function setSprite(imgEl, id){
-    const num = String(id).padStart(3,'0');
+  function setSprite(imgEl, dex){
+    const num = String(dex).padStart(3,'0');
     imgEl.src = `sprites/${num}.png`;
     imgEl.onerror = ()=>{ imgEl.src = ''; imgEl.alt = 'No local sprite'; };
+  }
+  function renderMoves(el, moves){
+    if (!moves || !moves.length){ el.innerHTML = '–'; return; }
+    el.innerHTML = moves.map(m=>`<span>${m}</span>`).join('');
   }
 
   // ------------------ Render ------------------
   function showPokemon(p){
     if (!p){ resultEl.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
     resultEl.classList.remove('hidden'); emptyState.classList.add('hidden');
-    titleEl.textContent = `${p.name} #${String(p.id).padStart(3,'0')}`;
+    titleEl.textContent = `${p.name} #${String(p.dex).padStart(3,'0')}`;
     typesEl.innerHTML = formatTypes(p.types);
-    setSprite(spriteEl, p.id);
+    setSprite(spriteEl, p.dex);
     const mults = defendMultipliers(p.types);
     const {weak,res,imm} = listFromMults(mults);
     weakEl.textContent = weak.join(', ') || '–';
     resEl.textContent = res.join(', ') || '–';
     immEl.textContent = imm.join(', ') || '–';
+    const stats = p.stats || {};
+    statsEl.textContent = stats.attack ? `ATK ${stats.attack} · DEF ${stats.defense} · STA ${stats.stamina}` : '–';
+    renderMoves(fastMovesEl, p.moves?.fast || []);
+    renderMoves(chargedMovesEl, p.moves?.charged || []);
     vsName.textContent = p.name;
     renderRankings(rankTeamAgainst(p));
   }
@@ -327,7 +418,7 @@
       slot.className = 'slot';
       if (name){
         const p = POKEMON.find(x=>x.name===name);
-        const idp = p ? String(p.id).padStart(3,'0') : '000';
+        const idp = p ? String(p.dex).padStart(3,'0') : '000';
         slot.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px;">
             <img alt="" width="40" height="40" style="image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022;" onerror="this.style.opacity=.3" src="sprites/${idp}.png"/>
