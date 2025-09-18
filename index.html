@@ -31,8 +31,24 @@
     .stat b { font-size: 18px; }
     .weak { color: var(--bad); }
     .res { color: var(--good); }
-    .moves-list { display:flex; flex-direction:column; gap:4px; font-size:13px; line-height:1.3; }
-    .moves-list span { background:#0b132b; border-radius:6px; padding:4px 6px; border:1px solid #1e294f; }
+    .moves-list { display:flex; flex-direction:column; gap:6px; font-size:13px; line-height:1.3; }
+    .moves-list button { width:100%; padding:6px 8px; border-radius:8px; border:1px solid #1e294f; background:#0b132b; color:#e6eefc; font:inherit; text-align:left; cursor:pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    .moves-list button.recommended::before { content:'★'; color:var(--accent); margin-right:6px; font-size:12px; }
+    .moves-list button.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(110,231,255,.4); background: rgba(110,231,255,.12); }
+    .moves-list button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .moves-list button .label { font-size:11px; color: var(--muted); text-transform: uppercase; letter-spacing:.05em; }
+    .moves-list.mini { gap:4px; }
+    .moves-list.mini button { font-size:11px; padding:4px 6px; }
+    .team-entry { display:flex; align-items:flex-start; gap:10px; }
+    .team-entry .team-thumb { width:40px; height:40px; image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022; object-fit:contain; }
+    .team-actions { display:flex; flex-direction:column; gap:6px; }
+    .team-actions button { width:auto; padding:6px 10px; }
+    #featuredMoves { display:flex; flex-direction:column; gap:6px; }
+    .featured-row { border:1px solid #1e294f; border-radius:10px; padding:8px 10px; background:#0b132b; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .featured-row:last-child { margin-bottom:0; }
+    .featured-row.active { border-color: var(--accent); color:#e6eefc; }
+    .featured-row .label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; color:var(--muted); margin-bottom:2px; }
+    .featured-row.active .label { color: var(--accent); }
     .statline { margin-top:6px; font-size:13px; color: var(--muted); }
     .team { display: grid; grid-template-columns: 1fr; gap: 10px; }
     .team .slot { width: 100%; }
@@ -89,6 +105,11 @@
         Voice tips: Press and hold the mic, say the name (e.g., <span class="kbd">pikachu</span>), release. Works best in Chrome / Edge.
       </div>
 
+      <div style="margin-top:16px;">
+        <label for="leagueSelect">League defaults</label>
+        <select id="leagueSelect" aria-label="Select PvP league"></select>
+      </div>
+
       <hr style="border-color:#1e294f; margin:14px 0; opacity:.5;"/>
 
       <div>
@@ -122,6 +143,7 @@
               <div class="stat"><div>GO Stats</div><div id="goStats" class="statline">–</div></div>
               <div class="stat"><div>Fast attacks</div><div class="moves-list" id="fastMoves">–</div></div>
               <div class="stat"><div>Charged attacks</div><div class="moves-list" id="chargedMoves">–</div></div>
+              <div class="stat"><div>Featured moves (PvPoke)</div><div id="featuredMoves">–</div></div>
             </div>
           </div>
         </div>
@@ -390,7 +412,91 @@
       }
     }
   ];
-  let POKEMON = SAMPLE_DATA;
+
+  const LEAGUES = [
+    { key: 'great', label: 'Great League (1500 CP)', short: 'Great' },
+    { key: 'ultra', label: 'Ultra League (2500 CP)', short: 'Ultra' },
+    { key: 'master', label: 'Master League (10000 CP)', short: 'Master' },
+    { key: 'little', label: 'Little League (500 CP)', short: 'Little' },
+  ];
+  const LEAGUE_PRIORITY = LEAGUES.map(l => l.key);
+  const ACTIVE_MOVES_STORAGE_KEY = 'activeMovesV1';
+  const LEAGUE_STORAGE_KEY = 'preferredLeague';
+
+  let POKEMON = [];
+  let POKEMON_BY_SLUG = new Map();
+  let currentPokemon = null;
+  let currentLeague = 'great';
+  let activeMovesState = {};
+
+  function leagueInfo(key){
+    return LEAGUES.find(l => l.key === key) || null;
+  }
+  function leagueLabel(key){
+    const info = leagueInfo(key);
+    return info ? info.label : key;
+  }
+  function leagueShort(key){
+    const info = leagueInfo(key);
+    return info ? info.short : key;
+  }
+  function loadStoredLeague(){
+    try {
+      const stored = localStorage.getItem(LEAGUE_STORAGE_KEY);
+      if (stored && LEAGUE_PRIORITY.includes(stored)) return stored;
+    } catch {}
+    return LEAGUE_PRIORITY[0];
+  }
+  function loadActiveMoves(){
+    try {
+      const raw = localStorage.getItem(ACTIVE_MOVES_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  function saveActiveMoves(){
+    try { localStorage.setItem(ACTIVE_MOVES_STORAGE_KEY, JSON.stringify(activeMovesState)); } catch {}
+  }
+  function dedupePokemon(list){
+    const seen = new Set();
+    const out = [];
+    for (const entry of list || []){
+      if (!entry) continue;
+      const slug = (entry.slug || '').toLowerCase();
+      const key = slug || `${entry.dex || 0}:${(entry.name || '').toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(entry);
+    }
+    return out;
+  }
+  function rebuildPokemonIndex(){
+    POKEMON_BY_SLUG = new Map();
+    for (const entry of POKEMON){
+      if (!entry) continue;
+      if (entry.slug) POKEMON_BY_SLUG.set(entry.slug, entry);
+      if (entry.name) POKEMON_BY_SLUG.set(entry.name.toLowerCase(), entry);
+    }
+  }
+  function applyDataset(list){
+    const deduped = dedupePokemon(list || []);
+    if (list && list.length && deduped.length !== list.length){
+      console.log(`Removed ${list.length - deduped.length} duplicate entries from dataset.`);
+    }
+    POKEMON = deduped;
+    rebuildPokemonIndex();
+    if (currentPokemon){
+      const updated = getPokemonBySlug(currentPokemon.slug) || byName(currentPokemon.name);
+      if (updated) currentPokemon = updated;
+    }
+  }
+
+  activeMovesState = loadActiveMoves();
+  currentLeague = loadStoredLeague();
+  applyDataset(SAMPLE_DATA);
 
   async function tryLoadExternalData(){
     try {
@@ -398,7 +504,7 @@
       if (!res.ok) return;
       const json = await res.json();
       if (Array.isArray(json) && json.length) {
-        POKEMON = json;
+        applyDataset(json);
         console.log(`Loaded external dataset with ${json.length} Pokémon.`);
       }
     } catch(e){ console.warn('Using built-in sample data.', e); }
@@ -427,6 +533,8 @@
   const spriteEl = document.getElementById('sprite');
   const vsName = document.getElementById('vsName');
   const rankingsEl = document.getElementById('rankings');
+  const leagueSelect = document.getElementById('leagueSelect');
+  const featuredMovesEl = document.getElementById('featuredMoves');
 
   // ------------------ Helpers ------------------
   function byName(name){
@@ -480,18 +588,144 @@
     const lower = raw.toLowerCase();
     return moves.find(m => (m.name && m.name.toLowerCase() === lower)) || null;
   }
-  function getRecommendedMoveset(p){
+  function activeMovesKey(p, league){
+    const slug = (p?.slug || p?.name || '').toString().toLowerCase();
+    return `${league || 'any'}::${slug}`;
+  }
+  function getPokemonBySlug(slug){
+    if (!slug) return null;
+    return POKEMON_BY_SLUG.get(slug) || POKEMON_BY_SLUG.get(slug.toLowerCase()) || null;
+  }
+  function getRecommendedInfo(p, league = currentLeague){
     const pool = getMoveCache(p);
     const rec = p.moves?.recommended || {};
-    let fast = null;
-    if (rec.fast) fast = findMove(pool.fast, rec.fast);
-    if (!fast) fast = pool.fast[0] || null;
-    let charged = [];
-    if (Array.isArray(rec.charged)){
-      charged = rec.charged.map(id=>findMove(pool.charged, id)).filter(Boolean);
+    const perLeagueRaw = rec.perLeague || rec.leagues || {};
+    const resolvedPerLeague = {};
+    for (const [key, moves] of Object.entries(perLeagueRaw || {})){
+      if (!moves) continue;
+      const resolved = {};
+      if (moves.fast){
+        const fastMove = findMove(pool.fast, moves.fast);
+        if (fastMove) resolved.fast = fastMove;
+      }
+      if (Array.isArray(moves.charged)){
+        const chargedMoves = moves.charged.map(id=>findMove(pool.charged, id)).filter(Boolean);
+        if (chargedMoves.length) resolved.charged = chargedMoves;
+      }
+      if (Object.keys(resolved).length){
+        resolvedPerLeague[key] = resolved;
+      }
     }
+    const preferred = [];
+    if (league && resolvedPerLeague[league]) preferred.push(league);
+    if (rec.league && resolvedPerLeague[rec.league]) preferred.push(rec.league);
+    if (rec.default && resolvedPerLeague[rec.default]) preferred.push(rec.default);
+    for (const key of LEAGUE_PRIORITY){
+      if (resolvedPerLeague[key]) preferred.push(key);
+    }
+    const uniquePreferred = Array.from(new Set(preferred));
+    let selectedLeague = uniquePreferred.find(key => resolvedPerLeague[key]) || null;
+    let fast = null;
+    let charged = [];
+    if (selectedLeague){
+      const set = resolvedPerLeague[selectedLeague];
+      if (set.fast) fast = set.fast;
+      if (set.charged && set.charged.length) charged = set.charged.slice(0,2);
+    }
+    if (!fast && rec.fast){
+      const fallbackFast = findMove(pool.fast, rec.fast);
+      if (fallbackFast) fast = fallbackFast;
+    }
+    if (!charged.length && Array.isArray(rec.charged)){
+      const fallbackCharged = rec.charged.map(id=>findMove(pool.charged, id)).filter(Boolean);
+      if (fallbackCharged.length) charged = fallbackCharged.slice(0,2);
+    }
+    if (!fast){
+      for (const key of LEAGUE_PRIORITY){
+        const set = resolvedPerLeague[key];
+        if (set?.fast){ fast = set.fast; break; }
+      }
+    }
+    if (!charged.length){
+      for (const key of LEAGUE_PRIORITY){
+        const set = resolvedPerLeague[key];
+        if (set?.charged?.length){ charged = set.charged.slice(0,2); break; }
+      }
+    }
+    if (!fast) fast = pool.fast[0] || null;
     if (!charged.length) charged = pool.charged.slice(0,2);
-    return {fast, charged, pool};
+    const highlightFast = new Set();
+    const highlightCharged = new Set();
+    if (selectedLeague && resolvedPerLeague[selectedLeague]){
+      const set = resolvedPerLeague[selectedLeague];
+      if (set.fast) highlightFast.add(set.fast.id);
+      if (set.charged){ set.charged.forEach(m=>highlightCharged.add(m.id)); }
+    }
+    if (rec.fast){
+      const fallbackFast = findMove(pool.fast, rec.fast);
+      if (fallbackFast) highlightFast.add(fallbackFast.id);
+    }
+    if (Array.isArray(rec.charged)){
+      rec.charged.forEach(id=>{
+        const mv = findMove(pool.charged, id);
+        if (mv) highlightCharged.add(mv.id);
+      });
+    }
+    return {
+      pool,
+      fast,
+      charged,
+      league: selectedLeague,
+      perLeague: resolvedPerLeague,
+      highlightFast: Array.from(highlightFast),
+      highlightCharged: Array.from(highlightCharged),
+    };
+  }
+  function getActiveMoveset(p, league = currentLeague){
+    const recommended = getRecommendedInfo(p, league);
+    const pool = recommended.pool;
+    let fast = recommended.fast;
+    let charged = recommended.charged ? recommended.charged.slice(0,2) : [];
+    const key = activeMovesKey(p, league);
+    const stored = activeMovesState[key];
+    if (stored){
+      if (stored.fast){
+        const move = findMove(pool.fast, stored.fast);
+        if (move) fast = move;
+      }
+      if (Array.isArray(stored.charged)){
+        const selected = stored.charged.map(id=>findMove(pool.charged, id)).filter(Boolean);
+        if (selected.length) charged = selected.slice(0,2);
+      }
+    }
+    if (!fast) fast = pool.fast[0] || null;
+    if (!charged.length) charged = (recommended.charged || []).slice(0,2);
+    if (!charged.length) charged = pool.charged.slice(0,2);
+    return {
+      fast,
+      charged,
+      pool,
+      league,
+      recommended,
+      highlight: {
+        fast: recommended.highlightFast,
+        charged: recommended.highlightCharged,
+      },
+    };
+  }
+  function setActiveMoves(p, league, fastMove, chargedMoves){
+    if (!p) return;
+    const key = activeMovesKey(p, league);
+    const payload = {};
+    if (fastMove?.id) payload.fast = fastMove.id;
+    const chargedIds = (chargedMoves || []).map(m=>m?.id).filter(Boolean);
+    if (chargedIds.length) payload.charged = chargedIds.slice(0,2);
+    if (!payload.fast && (!payload.charged || !payload.charged.length)){
+      delete activeMovesState[key];
+    } else {
+      activeMovesState[key] = payload;
+    }
+    saveActiveMoves();
   }
   function powerScore(p){
     const s = p.stats || {};
@@ -526,8 +760,10 @@
     const speedBonus = 1 + 40 / Math.max(35, energyCost);
     return {score: dpe * mult * powerBonus * speedBonus, mult, move};
   }
-  function evaluatePokemonAgainst(attacker, defender){
-    const {fast, charged} = getRecommendedMoveset(attacker);
+  function evaluatePokemonAgainst(attacker, defender, moveset){
+    const chosen = moveset || getActiveMoveset(attacker, currentLeague);
+    const fast = chosen.fast;
+    const charged = chosen.charged || [];
     const defenderTypes = defender.types || [];
     const fastResult = scoreFastMove(fast, attacker, defenderTypes);
     const chargedResults = charged.map(m=>scoreChargedMove(m, attacker, defenderTypes));
@@ -555,25 +791,163 @@
   }
   function rankTeamAgainst(defender){
     const team = getTeam().map(name=>POKEMON.find(p=>p.name===name)).filter(Boolean);
-    return team.map(p => evaluatePokemonAgainst(p, defender)).sort((a,b)=>b.score-a.score);
+    return team
+      .map(p => {
+        const moveset = getActiveMoveset(p, currentLeague);
+        return evaluatePokemonAgainst(p, defender, moveset);
+      })
+      .sort((a,b)=>b.score-a.score);
   }
-  function setSprite(imgEl, dex){
+  function setSprite(imgEl, pokemon){
+    if (!imgEl) return;
+    if (!pokemon){
+      imgEl.src = '';
+      imgEl.alt = 'No image';
+      imgEl.classList.add('no-sprite');
+      return;
+    }
+    const dex = Number(pokemon.dex || 0);
+    const slug = (pokemon.slug || pokemon.name || '').toString().toLowerCase();
     const num = String(dex).padStart(3,'0');
-    imgEl.src = `sprites/${num}.png`;
-    imgEl.onerror = ()=>{ imgEl.src = ''; imgEl.alt = 'No local sprite'; };
+    const sanitizedSlug = slug.replace(/[^a-z0-9-]/g,'');
+    const sources = [
+      `sprites/${num}.png`,
+      sanitizedSlug ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug}.png` : null,
+      sanitizedSlug && sanitizedSlug.endsWith('-shadow') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-shadow$/, '')}.png` : null,
+      sanitizedSlug && sanitizedSlug.endsWith('-purified') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-purified$/, '')}.png` : null,
+      dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dex}.png` : null,
+      dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png` : null,
+    ].filter(Boolean);
+    const uniqueSources = [];
+    for (const src of sources){ if (!uniqueSources.includes(src)) uniqueSources.push(src); }
+    let index = 0;
+    const tryNext = ()=>{
+      if (index >= uniqueSources.length){
+        imgEl.onerror = null;
+        imgEl.src = '';
+        imgEl.alt = 'No image available';
+        imgEl.classList.add('no-sprite');
+        return;
+      }
+      const next = uniqueSources[index++];
+      imgEl.onerror = tryNext;
+      imgEl.src = next;
+      imgEl.alt = pokemon.name || 'Pokémon';
+    };
+    imgEl.onload = ()=>{ imgEl.onerror = null; imgEl.classList.remove('no-sprite'); };
+    tryNext();
   }
-  function renderMoves(el, moves){
-    if (!moves || !moves.length){ el.innerHTML = '–'; return; }
-    el.innerHTML = moves.map(m=>`<span>${describeMove(m)}</span>`).join('');
+  function renderMoveOptions(container, moves, { pokemon, league, category, selectedIds = [], recommendedIds = [], maxSelect = 1 } = {}){
+    if (!container) return;
+    if (!moves || !moves.length){
+      container.textContent = '–';
+      container.dataset.category = category || '';
+      container.dataset.pokemonSlug = pokemon?.slug || '';
+      container.dataset.league = league || currentLeague;
+      return;
+    }
+    container.innerHTML = '';
+    container.dataset.category = category || '';
+    container.dataset.pokemonSlug = pokemon?.slug || '';
+    container.dataset.league = league || currentLeague;
+    container.dataset.maxSelect = String(maxSelect);
+    if (!container._moveHandlerAttached){
+      container.addEventListener('click', onMoveOptionClick);
+      container._moveHandlerAttached = true;
+    }
+    const selectedSet = new Set((selectedIds || []).map(id=>String(id)));
+    const recommendedSet = new Set((recommendedIds || []).map(id=>String(id)));
+    for (const move of moves){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.moveId = move.id;
+      btn.textContent = describeMove(move);
+      if (selectedSet.has(move.id)) btn.classList.add('active');
+      if (recommendedSet.has(move.id)) btn.classList.add('recommended');
+      container.appendChild(btn);
+    }
+  }
+  function onMoveOptionClick(event){
+    const target = event.target.closest('button[data-move-id]');
+    if (!target) return;
+    const container = target.closest('.moves-list');
+    if (!container) return;
+    const moveId = target.dataset.moveId;
+    const category = container.dataset.category || 'fast';
+    const league = container.dataset.league || currentLeague;
+    const slug = container.dataset.pokemonSlug;
+    const pokemon = getPokemonBySlug(slug) || byName(slug);
+    if (!pokemon) return;
+    const moveset = getActiveMoveset(pokemon, league);
+    if (category === 'fast'){
+      const fastMove = findMove(moveset.pool.fast, moveId);
+      if (!fastMove) return;
+      setActiveMoves(pokemon, league, fastMove, moveset.charged);
+    } else {
+      const chargedMove = findMove(moveset.pool.charged, moveId);
+      if (!chargedMove) return;
+      const maxSelect = Number(container.dataset.maxSelect || 2);
+      const current = moveset.charged.slice();
+      const existingIndex = current.findIndex(m => m?.id === chargedMove.id);
+      if (existingIndex >= 0){
+        current.splice(existingIndex, 1);
+      } else {
+        if (current.length >= maxSelect){
+          current.shift();
+        }
+        current.push(chargedMove);
+      }
+      setActiveMoves(pokemon, league, moveset.fast, current);
+    }
+    if (league === currentLeague){
+      if (currentPokemon && currentPokemon.slug === (pokemon.slug || '')){
+        showPokemon(pokemon);
+      } else if (currentPokemon){
+        renderRankings(rankTeamAgainst(currentPokemon));
+      }
+    }
+    renderTeam();
+  }
+  function renderFeaturedMoves(pokemon, recommended){
+    if (!featuredMovesEl) return;
+    featuredMovesEl.innerHTML = '';
+    if (!recommended){
+      featuredMovesEl.textContent = 'No PvPoke recommendations found.';
+      return;
+    }
+    let added = false;
+    if (recommended.perLeague){
+      for (const key of LEAGUE_PRIORITY){
+        const set = recommended.perLeague[key];
+        if (!set) continue;
+        added = true;
+        const row = document.createElement('div');
+        row.className = 'featured-row';
+        if (key === (recommended.league || currentLeague)) row.classList.add('active');
+        const fastText = set.fast ? describeMove(set.fast) : '–';
+        const chargedText = set.charged && set.charged.length ? set.charged.map(describeMove).join(', ') : '–';
+        row.innerHTML = `<span class="label">${leagueLabel(key)}</span><div>Fast: ${fastText}</div><div>Charged: ${chargedText}</div>`;
+        featuredMovesEl.appendChild(row);
+      }
+    }
+    if (!added){
+      const fastMove = recommended.fast ? describeMove(recommended.fast) : '–';
+      const chargedMoves = recommended.charged && recommended.charged.length ? recommended.charged.map(describeMove).join(', ') : '–';
+      const row = document.createElement('div');
+      row.className = 'featured-row active';
+      row.innerHTML = `<span class="label">Default</span><div>Fast: ${fastMove}</div><div>Charged: ${chargedMoves}</div>`;
+      featuredMovesEl.appendChild(row);
+    }
   }
 
   // ------------------ Render ------------------
   function showPokemon(p){
+    currentPokemon = p || null;
     if (!p){ resultEl.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
     resultEl.classList.remove('hidden'); emptyState.classList.add('hidden');
     titleEl.textContent = `${p.name} #${String(p.dex).padStart(3,'0')}`;
     typesEl.innerHTML = formatTypes(p.types);
-    setSprite(spriteEl, p.dex);
+    setSprite(spriteEl, p);
     const mults = defendMultipliers(p.types);
     const {weak,res,imm} = listFromMults(mults);
     weakEl.textContent = weak.join(', ') || '–';
@@ -581,10 +955,27 @@
     immEl.textContent = imm.join(', ') || '–';
     const stats = p.stats || {};
     statsEl.textContent = stats.attack ? `ATK ${stats.attack} · DEF ${stats.defense} · STA ${stats.stamina}` : '–';
-    const movePool = getMoveCache(p);
-    renderMoves(fastMovesEl, movePool.fast);
-    renderMoves(chargedMovesEl, movePool.charged);
-    vsName.textContent = p.name;
+    const moveset = getActiveMoveset(p, currentLeague);
+    const selectedFast = moveset.fast ? [moveset.fast.id] : [];
+    const selectedCharged = (moveset.charged || []).map(m=>m.id);
+    renderMoveOptions(fastMovesEl, moveset.pool.fast, {
+      pokemon: p,
+      league: currentLeague,
+      category: 'fast',
+      selectedIds: selectedFast,
+      recommendedIds: moveset.highlight.fast,
+      maxSelect: 1,
+    });
+    renderMoveOptions(chargedMovesEl, moveset.pool.charged, {
+      pokemon: p,
+      league: currentLeague,
+      category: 'charged',
+      selectedIds: selectedCharged,
+      recommendedIds: moveset.highlight.charged,
+      maxSelect: 2,
+    });
+    renderFeaturedMoves(p, moveset.recommended);
+    vsName.textContent = `${p.name} (${leagueShort(currentLeague)} League)`;
     renderRankings(rankTeamAgainst(p));
   }
   function renderRankings(rows){
@@ -614,6 +1005,7 @@
         <div class="r">
           <div class="top">
             <span class="pill">${bestLabel}: ${bestMoveText}</span>
+            <span class="pill">League: ${leagueShort(currentLeague)}</span>
             <span class="pill">x${r.mult.toFixed(2)}</span>
             <span class="score">${r.score.toFixed(1)}</span>
           </div>
@@ -638,6 +1030,23 @@
         o.value = p.name; o.textContent = p.name; sel.appendChild(o);
       });
     }
+    if (currentPokemon && nameSelect){
+      nameSelect.value = currentPokemon.name;
+    }
+  }
+  function populateLeagueSelector(){
+    if (!leagueSelect) return;
+    leagueSelect.innerHTML = '';
+    LEAGUES.forEach(info => {
+      const opt = document.createElement('option');
+      opt.value = info.key;
+      opt.textContent = info.label;
+      leagueSelect.appendChild(opt);
+    });
+    if (!LEAGUE_PRIORITY.includes(currentLeague)){
+      currentLeague = LEAGUE_PRIORITY[0];
+    }
+    leagueSelect.value = currentLeague;
   }
   function getTeam(){
     try { return JSON.parse(localStorage.getItem('team3')||'[]'); } catch { return []; }
@@ -655,24 +1064,49 @@
       slot.className = 'slot';
       if (name){
         const p = POKEMON.find(x=>x.name===name);
-        const idp = p ? String(p.dex).padStart(3,'0') : '000';
-        const moveset = p ? getRecommendedMoveset(p) : {fast:null, charged:[]};
-        const fastText = p ? describeMove(moveset.fast) : '–';
-        const chargedText = p ? (moveset.charged.length ? moveset.charged.map(describeMove).join(', ') : '–') : '–';
-        const typeHtml = p ? formatTypes(p.types) : '';
-        slot.innerHTML = `
-          <div style="display:flex; align-items:flex-start; gap:8px;">
-            <img alt="" width="40" height="40" style="image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022;" onerror="this.style.opacity=.3" src="sprites/${idp}.png"/>
-            <div style="flex:1;">
-              <b>${p ? p.name : name}</b>
-              <div class="types">${typeHtml}</div>
-              <div class="team-moves">
-                <div><span class="label">Fast</span>${fastText}</div>
-                <div><span class="label">Charged</span>${chargedText}</div>
+        if (!p){
+          slot.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div>
+                <b>${name}</b>
+                <div class="hint">Data not available in this dataset.</div>
               </div>
-            </div>
-            <button style="margin-left: auto; width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
-          </div>`;
+              <button style="width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
+            </div>`;
+        } else {
+          const moveset = getActiveMoveset(p, currentLeague);
+          const fastText = moveset.fast ? describeMove(moveset.fast) : '–';
+          const chargedText = moveset.charged && moveset.charged.length ? moveset.charged.map(describeMove).join(', ') : '–';
+          slot.innerHTML = `
+            <div class="team-entry">
+              <img class="team-thumb" alt="${p.name}" />
+              <div style="flex:1;">
+                <b>${p.name}</b>
+                <div class="types">${formatTypes(p.types)}</div>
+                <div class="team-moves">
+                  <div><span class="label">Fast (${leagueShort(currentLeague)})</span>${fastText}</div>
+                  <div><span class="label">Charged</span>${chargedText}</div>
+                </div>
+              </div>
+              <div class="team-actions">
+                <button type="button" class="team-edit" data-slug="${p.slug}" style="width:auto;">Edit moves</button>
+                <button type="button" style="width:auto;" onclick="removeFromTeam(${i})">Remove</button>
+              </div>
+            </div>`;
+          const img = slot.querySelector('img.team-thumb');
+          if (img) setSprite(img, p);
+          const editBtn = slot.querySelector('button.team-edit');
+          if (editBtn){
+            editBtn.onclick = ()=>{
+              nameInput.value = p.name;
+              nameSelect.value = p.name;
+              showPokemon(p);
+              try {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } catch {}
+            };
+          }
+        }
       } else {
         slot.textContent = 'Empty';
       }
@@ -759,11 +1193,23 @@
     if (t.length >= 3) return alert('Team is full (max 3). Remove one first.');
     t.push(sel); setTeam(t);
   };
+  if (leagueSelect){
+    leagueSelect.onchange = ()=>{
+      const value = leagueSelect.value;
+      currentLeague = LEAGUE_PRIORITY.includes(value) ? value : LEAGUE_PRIORITY[0];
+      try { localStorage.setItem(LEAGUE_STORAGE_KEY, currentLeague); } catch {}
+      renderTeam();
+      if (currentPokemon){
+        showPokemon(currentPokemon);
+      }
+    };
+  }
 
   // ------------------ Boot ------------------
   (async function(){
     await tryLoadExternalData();
     populateSelectors();
+    populateLeagueSelector();
     renderTeam();
     setupVoice();
   })();

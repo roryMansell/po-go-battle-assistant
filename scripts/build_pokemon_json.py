@@ -28,11 +28,11 @@ from typing import Dict, Iterable, List, Optional
 
 GM_URL = "https://raw.githubusercontent.com/PokeMiners/game_masters/master/latest/latest.json"
 MOVE_URL = "https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-json-pokedex/master/output/move.json"
-PVP_RANKING_URLS = [
-    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-1500.json",
-    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-2500.json",
-    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json",
-    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-500.json",
+PVP_RANKING_SOURCES = [
+    ("great", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-1500.json"),
+    ("ultra", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-2500.json"),
+    ("master", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json"),
+    ("little", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-500.json"),
 ]
 DEFAULT_OUT = Path("data/pokemon.min.json")
 
@@ -199,11 +199,11 @@ def load_move_map() -> Dict[str, Dict[str, object]]:
     return out
 
 
-def load_pvpoke_movesets() -> Dict[str, Dict[str, List[str]]]:
+def load_pvpoke_movesets() -> Dict[str, Dict[str, object]]:
     """Fetch recommended movesets from PvPoke rankings."""
 
-    combos: Dict[str, Dict[str, List[str]]] = {}
-    for url in PVP_RANKING_URLS:
+    combos: Dict[str, Dict[str, object]] = {}
+    for league, url in PVP_RANKING_SOURCES:
         try:
             rows = load_json(url)
         except Exception as exc:  # pragma: no cover - network failure fallback
@@ -216,12 +216,16 @@ def load_pvpoke_movesets() -> Dict[str, Dict[str, List[str]]]:
             if not species_id or not moveset or len(moveset) < 3:
                 continue
             slug = species_id.replace("_", "-")
-            if slug in combos:
+            entry = combos.setdefault(slug, {"per_league": OrderedDict()})
+            league_map: OrderedDict[str, Dict[str, List[str]]] = entry["per_league"]
+            if league in league_map:
                 continue
-            combos[slug] = {
-                "fast": [moveset[0]],
+            league_map[league] = {
+                "fast": moveset[0],
                 "charged": list(moveset[1:3]),
             }
+            if "default" not in entry:
+                entry["default"] = league
             added += 1
         log(f"Loaded {added} PvPoke movesets from {url}")
     return combos
@@ -287,21 +291,57 @@ def build(
                     break
         return resolved or None
 
-    def find_recommended(slug: str, fast_list: List[OrderedDict], charged_list: List[OrderedDict]) -> Optional[Dict[str, object]]:
+    def find_recommended(
+        slug: str, fast_list: List[OrderedDict], charged_list: List[OrderedDict]
+    ) -> Optional[Dict[str, object]]:
         rec = recommended_map.get(slug)
         if not rec:
             return None
+
         out: Dict[str, object] = {}
-        fast_candidates = rec.get("fast", [])
-        charged_candidates = rec.get("charged", [])
-        if fast_candidates:
-            fast_matches = match_ids(fast_list, fast_candidates)
-            if fast_matches:
-                out["fast"] = fast_matches[0]
-        if charged_candidates:
-            charged_matches = match_ids(charged_list, charged_candidates)
-            if charged_matches:
-                out["charged"] = charged_matches
+        per_league: Dict[str, Dict[str, List[str]]] = rec.get("per_league", {})
+        resolved_leagues: Dict[str, Dict[str, object]] = {}
+
+        for league, moves in per_league.items():
+            fast_matches = match_ids(fast_list, [moves.get("fast")]) if moves.get("fast") else None
+            charged_matches = (
+                match_ids(charged_list, moves.get("charged", []))
+                if moves.get("charged")
+                else None
+            )
+            if fast_matches or charged_matches:
+                resolved: Dict[str, object] = {}
+                if fast_matches:
+                    resolved["fast"] = fast_matches[0]
+                if charged_matches:
+                    resolved["charged"] = charged_matches
+                resolved_leagues[league] = resolved
+
+        if resolved_leagues:
+            out["perLeague"] = resolved_leagues
+            default_league = rec.get("default")
+            default_set = None
+            if default_league and default_league in resolved_leagues:
+                default_set = resolved_leagues[default_league]
+                out["league"] = default_league
+            if not default_set:
+                default_set = next(iter(resolved_leagues.values()))
+            if default_set.get("fast"):
+                out["fast"] = default_set["fast"]
+            if default_set.get("charged"):
+                out["charged"] = default_set["charged"]
+        else:
+            fast_candidates = rec.get("fast", [])
+            charged_candidates = rec.get("charged", [])
+            if fast_candidates:
+                fast_matches = match_ids(fast_list, fast_candidates)
+                if fast_matches:
+                    out["fast"] = fast_matches[0]
+            if charged_candidates:
+                charged_matches = match_ids(charged_list, charged_candidates)
+                if charged_matches:
+                    out["charged"] = charged_matches
+
         return out or None
 
     def add_entry(
