@@ -93,8 +93,8 @@
       padding: 12px 14px;
       border-radius: 12px;
       border: 1px solid rgba(62, 86, 146, 0.7);
-      background: linear-gradient(135deg, rgba(7, 13, 32, 0.9), rgba(9, 16, 38, 0.9));
-      color: #f2f6ff;
+      background: linear-gradient(135deg, rgba(9, 17, 40, 0.95), rgba(12, 24, 50, 0.95));
+      color: #f5f9ff;
       font-size: 14px;
       outline: none;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -106,6 +106,18 @@
     }
     input::placeholder {
       color: rgba(142, 163, 199, 0.8);
+    }
+    select option {
+      background-color: #0b1326;
+      color: #f5f9ff;
+    }
+    select option[value=""] {
+      color: rgba(142, 163, 199, 0.9);
+    }
+    select option:checked,
+    select option:hover {
+      background-color: #162450;
+      color: #6ee7ff;
     }
     button {
       width: 100%;
@@ -155,6 +167,9 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       align-items: end;
+    }
+    .row.row--inputs {
+      align-items: start;
     }
     .hint {
       color: var(--muted);
@@ -753,24 +768,24 @@
 
   <main>
     <section class="card" aria-label="Controls">
-      <div class="row" role="group" aria-label="Search">
+      <div class="row row--inputs" role="group" aria-label="Search">
         <div>
           <label for="nameInput">Pokémon name</label>
           <input id="nameInput" placeholder="e.g. Charizard" autocomplete="off" />
-          <div class="hint">Type a name, pick from the list, or use voice.</div>
         </div>
         <div>
           <label for="nameSelect">Quick select</label>
           <select id="nameSelect" aria-label="Quick select Pokémon"></select>
         </div>
       </div>
+      <div class="hint">Type a name, pick from the list, or use voice.</div>
 
       <div class="row" style="margin-top:10px;">
         <button id="voiceBtn" class="voice-btn" aria-label="Hold to speak">
           <span class="mic" aria-hidden="true"></span>
           <span id="voiceLabel">Hold to speak</span>
         </button>
-        <button id="showBtn">Show info</button>
+        <button id="randomBtn" type="button" aria-label="Pick a random Pokémon">Random Pokémon</button>
       </div>
 
       <div class="hint" id="voiceHint">
@@ -1229,7 +1244,7 @@
   const voiceBtn = document.getElementById('voiceBtn');
   const voiceLabel = document.getElementById('voiceLabel');
   const voiceHintEl = document.getElementById('voiceHint');
-  const showBtn = document.getElementById('showBtn');
+  const randomBtn = document.getElementById('randomBtn');
   const resultEl = document.getElementById('result');
   const emptyState = document.getElementById('emptyState');
   const DEFAULT_EMPTY_TEXT = emptyState ? emptyState.textContent : '';
@@ -1957,6 +1972,12 @@
       nameSelect.value = currentPokemon.name;
     }
   }
+  function pickRandomPokemon(){
+    const pool = RELEASED_POKEMON.length ? RELEASED_POKEMON : POKEMON;
+    if (!pool.length) return null;
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    return pool[randomIndex] || null;
+  }
   function populateLeagueSelector(){
     if (!leagueSelect) return;
     leagueSelect.innerHTML = '';
@@ -2112,13 +2133,15 @@
   }
 
   // ------------------ Events ------------------
-  showBtn.onclick = ()=>{
-    const name = nameInput.value || nameSelect.value;
-    const p = byName(name);
-    if (!p){ alert('Pick a valid Pokémon name.'); return; }
-    nameSelect.value = p.name; nameInput.value = p.name;
-    showPokemon(p);
-  };
+  if (randomBtn){
+    randomBtn.onclick = ()=>{
+      const random = pickRandomPokemon();
+      if (!random) return;
+      nameInput.value = random.name;
+      if (nameSelect) nameSelect.value = random.name;
+      showPokemon(random);
+    };
+  }
   nameSelect.onchange = ()=>{
     const v = nameSelect.value; if (!v) return; nameInput.value = v; const p=byName(v); showPokemon(p);
   };
