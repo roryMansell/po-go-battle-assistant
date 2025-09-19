@@ -226,6 +226,7 @@
       name:"Bulbasaur",
       slug:"bulbasaur",
       types:["grass","poison"],
+      released:true,
       stats:{attack:118,defense:111,stamina:128},
       moves:{
         fast:[
@@ -245,6 +246,7 @@
       name:"Charmander",
       slug:"charmander",
       types:["fire"],
+      released:true,
       stats:{attack:116,defense:93,stamina:118},
       moves:{
         fast:[
@@ -424,6 +426,7 @@
   const LEAGUE_STORAGE_KEY = 'preferredLeague';
 
   let POKEMON = [];
+  let RELEASED_POKEMON = [];
   let POKEMON_BY_SLUG = new Map();
   let currentPokemon = null;
   let currentLeague = 'great';
@@ -487,10 +490,12 @@
       console.log(`Removed ${list.length - deduped.length} duplicate entries from dataset.`);
     }
     POKEMON = deduped;
+    RELEASED_POKEMON = deduped.filter(entry => entry && entry.released !== false);
     rebuildPokemonIndex();
     if (currentPokemon){
       const updated = getPokemonBySlug(currentPokemon.slug) || byName(currentPokemon.name);
-      if (updated) currentPokemon = updated;
+      if (updated && updated.released !== false) currentPokemon = updated;
+      else currentPokemon = null;
     }
   }
 
@@ -522,6 +527,7 @@
   const showBtn = document.getElementById('showBtn');
   const resultEl = document.getElementById('result');
   const emptyState = document.getElementById('emptyState');
+  const DEFAULT_EMPTY_TEXT = emptyState ? emptyState.textContent : '';
   const titleEl = document.getElementById('title');
   const typesEl = document.getElementById('types');
   const weakEl = document.getElementById('weakTo');
@@ -540,9 +546,10 @@
   function byName(name){
     name = (name || '').toString().trim().toLowerCase();
     if (!name) return null;
-    let p = POKEMON.find(x => x.name.toLowerCase() === name);
+    const pool = RELEASED_POKEMON.length ? RELEASED_POKEMON : POKEMON;
+    let p = pool.find(x => x.name.toLowerCase() === name);
     if (p) return p;
-    p = POKEMON.find(x => x.name.toLowerCase().startsWith(name)) || POKEMON.find(x => x.name.toLowerCase().includes(name));
+    p = pool.find(x => x.name.toLowerCase().startsWith(name)) || pool.find(x => x.name.toLowerCase().includes(name));
     return p || null;
   }
   function formatTypes(types){ return types.map(t=>`<span class="type">${t}</span>`).join(''); }
@@ -810,14 +817,21 @@
     const slug = (pokemon.slug || pokemon.name || '').toString().toLowerCase();
     const num = String(dex).padStart(3,'0');
     const sanitizedSlug = slug.replace(/[^a-z0-9-]/g,'');
-    const sources = [
+    const preferSlugArt = Boolean(sanitizedSlug && sanitizedSlug.includes('-'));
+    const slugSources = sanitizedSlug ? [
+      `sprites/${sanitizedSlug}.png`,
+      `sprites/${num}-${sanitizedSlug}.png`,
+      `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug}.png`,
+      sanitizedSlug.endsWith('-shadow') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-shadow$/, '')}.png` : null,
+      sanitizedSlug.endsWith('-purified') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-purified$/, '')}.png` : null,
+    ].filter(Boolean) : [];
+    const baseSources = [
       `sprites/${num}.png`,
-      sanitizedSlug ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug}.png` : null,
-      sanitizedSlug && sanitizedSlug.endsWith('-shadow') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-shadow$/, '')}.png` : null,
-      sanitizedSlug && sanitizedSlug.endsWith('-purified') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-purified$/, '')}.png` : null,
       dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dex}.png` : null,
       dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png` : null,
     ].filter(Boolean);
+    const combined = preferSlugArt ? [...slugSources, ...baseSources] : [...baseSources, ...slugSources];
+    const sources = combined.filter(Boolean);
     const uniqueSources = [];
     for (const src of sources){ if (!uniqueSources.includes(src)) uniqueSources.push(src); }
     let index = 0;
@@ -942,9 +956,24 @@
 
   // ------------------ Render ------------------
   function showPokemon(p){
-    currentPokemon = p || null;
-    if (!p){ resultEl.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
-    resultEl.classList.remove('hidden'); emptyState.classList.add('hidden');
+    if (!p || p.released === false){
+      currentPokemon = null;
+      if (emptyState){
+        emptyState.textContent = p && p.released === false
+          ? 'This Pokémon has not been released in Pokémon GO.'
+          : DEFAULT_EMPTY_TEXT;
+        emptyState.classList.remove('hidden');
+      }
+      if (resultEl) resultEl.classList.add('hidden');
+      return;
+    }
+    currentPokemon = p;
+    if (emptyState){
+      emptyState.textContent = DEFAULT_EMPTY_TEXT;
+      emptyState.classList.add('hidden');
+    }
+    resultEl.classList.remove('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
     titleEl.textContent = `${p.name} #${String(p.dex).padStart(3,'0')}`;
     typesEl.innerHTML = formatTypes(p.types);
     setSprite(spriteEl, p);
@@ -1018,7 +1047,8 @@
     });
   }
   function populateSelectors(){
-    const sorted = [...POKEMON].sort((a,b)=>a.name.localeCompare(b.name));
+    const pool = RELEASED_POKEMON.length ? RELEASED_POKEMON : POKEMON;
+    const sorted = [...pool].sort((a,b)=>a.name.localeCompare(b.name));
     for (const sel of [nameSelect, teamSelect]){
       sel.innerHTML = '';
       const opt0 = document.createElement('option');
@@ -1064,12 +1094,12 @@
       slot.className = 'slot';
       if (name){
         const p = POKEMON.find(x=>x.name===name);
-        if (!p){
+        if (!p || p.released === false){
           slot.innerHTML = `
             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
               <div>
                 <b>${name}</b>
-                <div class="hint">Data not available in this dataset.</div>
+                <div class="hint">Data not available (unreleased or missing from dataset).</div>
               </div>
               <button style="width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
             </div>`;

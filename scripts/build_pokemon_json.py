@@ -28,6 +28,9 @@ from typing import Dict, Iterable, List, Optional
 
 GM_URL = "https://raw.githubusercontent.com/PokeMiners/game_masters/master/latest/latest.json"
 MOVE_URL = "https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-json-pokedex/master/output/move.json"
+PVPOKE_POKEMON_URL = (
+    "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/gamemaster.min.json"
+)
 PVP_RANKING_SOURCES = [
     ("great", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-1500.json"),
     ("ultra", "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-2500.json"),
@@ -199,6 +202,47 @@ def load_move_map() -> Dict[str, Dict[str, object]]:
     return out
 
 
+def load_pvpoke_pokemon() -> Dict[str, Dict[str, object]]:
+    """Fetch PvPoke species data for release status and move lists."""
+
+    try:
+        data = load_json(PVPOKE_POKEMON_URL)
+    except Exception as exc:  # pragma: no cover - network failure fallback
+        log(f"Warning: could not load {PVPOKE_POKEMON_URL}: {exc}")
+        return {}
+
+    if isinstance(data, dict) and data.get("pokemon"):
+        rows = data.get("pokemon")
+    elif isinstance(data, list):
+        rows = data
+    else:
+        rows = []
+
+    overrides = {
+        # PvPoke marks a few released Pokémon as unreleased because they are
+        # banned from competitive play. Treat them as available in GO.
+        "ditto": True,
+        "shedinja": True,
+    }
+
+    mapping: Dict[str, Dict[str, object]] = {}
+    for row in rows:
+        species_id = row.get("speciesId")
+        if not species_id:
+            continue
+        slug = species_id.replace("_", "-")
+        released_value = row.get("released")
+        if species_id in overrides:
+            released_value = overrides[species_id]
+        mapping[slug] = {
+            "released": bool(released_value) if released_value is not None else None,
+            "fastMoves": [mid for mid in row.get("fastMoves", []) if mid],
+            "chargedMoves": [mid for mid in row.get("chargedMoves", []) if mid],
+        }
+    log(f"Loaded PvPoke metadata for {len(mapping)} species")
+    return mapping
+
+
 def load_pvpoke_movesets() -> Dict[str, Dict[str, object]]:
     """Fetch recommended movesets from PvPoke rankings."""
 
@@ -236,7 +280,9 @@ def build(
     move_map: Dict[str, Dict[str, object]],
     pokedex_map: Dict[int, str],
     recommended_map: Dict[str, Dict[str, List[str]]],
+    pvpoke_map: Dict[str, Dict[str, object]],
 ) -> List[Dict]:
+    dataset_list = list(dataset)
     output: List[Dict] = []
     seen: set = set()
 
@@ -344,13 +390,64 @@ def build(
 
         return out or None
 
+    form_meta: Dict[tuple, Dict[str, object]] = {}
+    combat_moves: Dict[str, Dict[str, object]] = {}
+
+    for item in dataset_list:
+        data = item.get("data", {}) if isinstance(item, dict) else {}
+        form_settings = data.get("formSettings")
+        if form_settings:
+            pokemon = form_settings.get("pokemon")
+            for form in form_settings.get("forms", []) or []:
+                form_id = form.get("form")
+                if not pokemon or not form_id:
+                    continue
+                meta = form_meta.setdefault((pokemon, form_id), {})
+                if form.get("isCostume"):
+                    meta["isCostume"] = True
+        combat = data.get("combatMove")
+        if combat and combat.get("uniqueId"):
+            combat_moves[combat["uniqueId"]] = combat
+
+    for mid, combat in combat_moves.items():
+        if mid in move_map:
+            continue
+        move_type = type_name(combat.get("type"))
+        energy = combat.get("energyDelta")
+        power = combat.get("power")
+        turns = combat.get("durationTurns")
+        category = "fast" if energy and energy > 0 else "charged"
+        entry = OrderedDict(
+            {
+                "id": mid,
+                "name": move_name(mid, move_map),
+                "type": move_type,
+                "category": category,
+                "power": int(power) if power is not None else None,
+                "energy": int(energy) if energy is not None else None,
+            }
+        )
+        if turns is not None:
+            entry["turns"] = round(turns, 2)
+            cooldown = turns * 0.5
+            entry["cooldown"] = round(cooldown, 2)
+            if power:
+                entry["dps"] = round(power / cooldown, 2)
+            if energy:
+                entry["eps"] = round(energy / cooldown, 2)
+        if category == "charged" and power and energy:
+            entry["dpe"] = round(power / abs(energy), 2)
+        move_map[mid] = entry
+
     def add_entry(
         dex: int,
+        pokemon_id: str,
         base_name: str,
         label: Optional[str],
         key: str,
         types: List[str],
         stats: Dict[str, int],
+        settings: Dict[str, object],
         fast_moves: Iterable[str],
         charged_moves: Iterable[str],
     ) -> None:
@@ -362,6 +459,35 @@ def build(
         seen.add(unique_key)
         name = base_name if not label else f"{base_name} ({label})"
         slug = slugify(name)
+
+        fast_moves = list(fast_moves or [])
+        charged_moves = list(charged_moves or [])
+
+        def resolve_move_id(move_id: str, category: str) -> Optional[str]:
+            if not move_id:
+                return None
+            candidate = str(move_id).upper()
+            options = [candidate]
+            if category == "fast" and not candidate.endswith("_FAST"):
+                options.append(f"{candidate}_FAST")
+            if category == "charged" and candidate.endswith("_FAST"):
+                options.append(candidate.replace("_FAST", ""))
+            for opt in options:
+                if opt in move_map:
+                    return opt
+            return candidate
+
+        pvp_info = pvpoke_map.get(slug)
+        if pvp_info:
+            for mid in pvp_info.get("fastMoves", []) or []:
+                resolved = resolve_move_id(mid, "fast")
+                if resolved and resolved not in fast_moves:
+                    fast_moves.append(resolved)
+            for mid in pvp_info.get("chargedMoves", []) or []:
+                resolved = resolve_move_id(mid, "charged")
+                if resolved and resolved not in charged_moves:
+                    charged_moves.append(resolved)
+
         fast_list = format_moves(fast_moves)
         charged_list = format_moves(charged_moves)
         moves = OrderedDict({
@@ -371,6 +497,18 @@ def build(
         recommended = find_recommended(slug, fast_list, charged_list)
         if recommended:
             moves["recommended"] = recommended
+
+        released_flag: Optional[bool] = None
+        if pvp_info and pvp_info.get("released") is not None:
+            released_flag = bool(pvp_info["released"])
+        if released_flag is None:
+            for attr in ("isTradable", "isTransferable", "isDeployable"):
+                val = settings.get(attr)
+                if val is not None:
+                    released_flag = bool(val)
+                    break
+        released = True if released_flag is None else bool(released_flag)
+
         entry = OrderedDict(
             {
                 "dex": dex,
@@ -383,11 +521,12 @@ def build(
                     "stamina": stats.get("baseStamina", 0),
                 },
                 "moves": moves,
+                "released": released,
             }
         )
         output.append(entry)
 
-    for item in dataset:
+    for item in dataset_list:
         settings = item.get("data", {}).get("pokemonSettings")
         if not settings:
             continue
@@ -398,7 +537,18 @@ def build(
         dex = int(m.group(1))
         pokemon_id = settings.get("pokemonId") or m.group(2)
         base_name = format_base_name(pokedex_map, dex, pokemon_id)
-        label = form_label(pokemon_id, settings.get("form"))
+        form_id = settings.get("form")
+        meta = form_meta.get((pokemon_id, form_id))
+        if meta and meta.get("isCostume"):
+            continue
+        label = form_label(pokemon_id, form_id)
+        form_key = form_id or "DEFAULT"
+        if isinstance(form_key, str) and (
+            form_key.endswith("_NORMAL")
+            or form_key.endswith("_STANDARD")
+            or form_key.endswith("_AVERAGE")
+        ):
+            form_key = "DEFAULT"
         types = [type_name(settings.get("type")), type_name(settings.get("type2"))]
 
         fast_moves = list(settings.get("quickMoves", [])) + list(settings.get("eliteQuickMove", []))
@@ -406,11 +556,13 @@ def build(
 
         add_entry(
             dex,
+            pokemon_id,
             base_name,
             label,
-            settings.get("form") or "DEFAULT",
+            form_key,
             types,
             settings.get("stats", {}),
+            settings,
             fast_moves,
             charged_moves,
         )
@@ -420,13 +572,18 @@ def build(
             if not temp_id:
                 continue
             otypes = [type_name(override.get("typeOverride1")), type_name(override.get("typeOverride2"))]
+            temp_meta = form_meta.get((pokemon_id, temp_id))
+            if temp_meta and temp_meta.get("isCostume"):
+                continue
             add_entry(
                 dex,
+                pokemon_id,
                 base_name,
                 format_temp_evo(temp_id),
                 temp_id,
                 otypes if any(otypes) else types,
                 override.get("stats", settings.get("stats", {})),
+                settings,
                 fast_moves,
                 charged_moves,
             )
@@ -456,8 +613,9 @@ def main() -> None:
     move_map = load_move_map()
     pokedex_map = load_pokedex_names()
     recommended_map = load_pvpoke_movesets()
+    pvpoke_map = load_pvpoke_pokemon()
 
-    entries = build(dataset, move_map, pokedex_map, recommended_map)
+    entries = build(dataset, move_map, pokedex_map, recommended_map, pvpoke_map)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as fh:
