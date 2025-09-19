@@ -5,73 +5,745 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Voice Pokédex — Offline</title>
   <style>
-    :root { --bg:#0b1020; --card:#121a34; --accent:#6ee7ff; --muted:#8ea3c7; --good:#34d399; --bad:#f87171; }
+    :root {
+      --bg: #050a17;
+      --bg-alt: #0f162c;
+      --card: rgba(16, 24, 48, 0.92);
+      --card-border: rgba(86, 112, 180, 0.45);
+      --accent: #6ee7ff;
+      --accent-strong: #4f9dff;
+      --muted: #8ea3c7;
+      --good: #34d399;
+      --bad: #f87171;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background: var(--bg); color:#e6eefc; }
-    header { padding: 18px 20px; border-bottom: 1px solid #1e294f; position:sticky; top:0; background:linear-gradient(180deg, #0b1020 0%, rgba(11,16,32,.94) 100%); backdrop-filter: blur(6px); z-index: 2; }
-    h1 { margin: 0; font-size: 22px; letter-spacing:.3px; }
-    main { max-width: 1100px; margin: 0 auto; padding: 22px; display: grid; grid-template-columns: 320px 1fr; gap: 22px; }
-    .card { background: var(--card); border:1px solid #1e294f; border-radius: 14px; padding: 16px; box-shadow: 0 8px 22px rgba(0,0,0,.25); }
-    label { display:block; font-size: 12px; text-transform: uppercase; letter-spacing:.06em; color: var(--muted); margin-bottom: 6px; }
-    input, select, button { width: 100%; padding: 12px 12px; border-radius: 10px; border:1px solid #2a396b; background:#0e1530; color:#eaf2ff; outline: none; }
-    input::placeholder { color:#6072a1; }
-    button { cursor: pointer; }
-    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
-    .flex { display:flex; gap:10px; align-items:center; }
-    .types { display:flex; gap:8px; flex-wrap:wrap; }
-    .type { padding: 6px 10px; border-radius: 999px; font-size: 12px; border:1px solid #2a396b; background:#0f1734; }
-    .pill { padding:4px 8px; border-radius: 999px; border:1px solid #2a396b; font-size:12px; color:var(--muted); }
-    .result { display:grid; grid-template-columns: 120px 1fr; gap:16px; }
-    .sprite { width: 110px; height:110px; image-rendering: pixelated; background:#0b1020; border:1px solid #27345f; border-radius: 14px; display:grid; place-items:center; }
-    .grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:10px; }
-    .grid.two { grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
-    .info-grid { grid-auto-rows: auto; }
-    .stat { background:#0f1734; border:1px solid #2a396b; border-radius:10px; padding:10px; }
-    .stat b { font-size: 18px; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(110, 231, 255, 0.18), transparent 45%),
+                  radial-gradient(circle at 80% 10%, rgba(79, 157, 255, 0.16), transparent 42%),
+                  linear-gradient(160deg, #040812 0%, #0b1326 100%);
+      color: #f2f6ff;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 15% 75%, rgba(94, 234, 212, 0.08), transparent 55%),
+                  radial-gradient(circle at 90% 80%, rgba(110, 231, 255, 0.12), transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    header {
+      padding: 24px 22px 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(180deg, rgba(5, 10, 23, 0.96) 0%, rgba(5, 10, 23, 0.72) 75%, transparent 100%);
+      backdrop-filter: blur(18px);
+    }
+    header h1 {
+      margin: 0 auto;
+      max-width: 1200px;
+      font-size: 24px;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(110, 231, 255, 0.3), transparent);
+      margin-left: 12px;
+    }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 22px 48px;
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) 1fr;
+      gap: 26px;
+      position: relative;
+      z-index: 1;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 25px 65px rgba(6, 10, 25, 0.55);
+      backdrop-filter: blur(14px);
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    input,
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(62, 86, 146, 0.7);
+      background: linear-gradient(135deg, rgba(7, 13, 32, 0.9), rgba(9, 16, 38, 0.9));
+      color: #f2f6ff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    input:focus,
+    select:focus {
+      border-color: rgba(110, 231, 255, 0.6);
+      box-shadow: 0 0 0 2px rgba(110, 231, 255, 0.22);
+    }
+    input::placeholder {
+      color: rgba(142, 163, 199, 0.8);
+    }
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      background: linear-gradient(135deg, rgba(110, 231, 255, 0.35), rgba(79, 157, 255, 0.55));
+      color: #021020;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+      box-shadow: 0 14px 38px rgba(9, 123, 255, 0.32);
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 46px rgba(9, 123, 255, 0.38);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button.ghost {
+      background: rgba(14, 22, 46, 0.85);
+      color: #f2f6ff;
+      border-color: rgba(62, 86, 146, 0.7);
+      box-shadow: none;
+    }
+    button.ghost:hover {
+      border-color: var(--accent);
+      background: rgba(17, 28, 56, 0.92);
+    }
+    button.danger {
+      color: #fda4af;
+      border-color: rgba(248, 113, 113, 0.4);
+    }
+    button.danger:hover {
+      border-color: rgba(248, 113, 113, 0.85);
+      color: #fecaca;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: end;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .flex {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .types {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .type {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: capitalize;
+      background: color-mix(in srgb, var(--type-color, rgba(255, 255, 255, 0.2)) 40%, transparent);
+      border: 1px solid color-mix(in srgb, var(--type-color, rgba(94, 106, 144, 0.9)) 55%, transparent);
+      color: color-mix(in srgb, var(--type-color, #9ec7ff) 70%, #f2f6ff 30%);
+    }
+    .type::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--type-color, var(--accent));
+    }
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(62, 86, 146, 0.8);
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(14, 22, 46, 0.85);
+    }
+    .result {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .sprite {
+      width: 118px;
+      height: 118px;
+      border-radius: 16px;
+      background: rgba(5, 10, 25, 0.7);
+      border: 1px solid rgba(47, 68, 118, 0.85);
+      display: grid;
+      place-items: center;
+      image-rendering: pixelated;
+    }
+    .sprite img {
+      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.4));
+    }
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+    .grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .stat {
+      background: rgba(8, 16, 36, 0.8);
+      border: 1px solid rgba(40, 60, 108, 0.8);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat b {
+      font-size: 18px;
+      font-weight: 700;
+    }
     .weak { color: var(--bad); }
     .res { color: var(--good); }
-    .moves-list { display:flex; flex-direction:column; gap:6px; font-size:13px; line-height:1.3; }
-    .moves-list button { width:100%; padding:6px 8px; border-radius:8px; border:1px solid #1e294f; background:#0b132b; color:#e6eefc; font:inherit; text-align:left; cursor:pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
-    .moves-list button.recommended::before { content:'★'; color:var(--accent); margin-right:6px; font-size:12px; }
-    .moves-list button.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(110,231,255,.4); background: rgba(110,231,255,.12); }
-    .moves-list button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    .moves-list button .label { font-size:11px; color: var(--muted); text-transform: uppercase; letter-spacing:.05em; }
-    .moves-list.mini { gap:4px; }
-    .moves-list.mini button { font-size:11px; padding:4px 6px; }
-    .team-entry { display:flex; align-items:flex-start; gap:10px; }
-    .team-entry .team-thumb { width:40px; height:40px; image-rendering:pixelated; border-radius:8px; border:1px solid #27345f; background:#091022; object-fit:contain; }
-    .team-actions { display:flex; flex-direction:column; gap:6px; }
-    .team-actions button { width:auto; padding:6px 10px; }
-    #featuredMoves { display:flex; flex-direction:column; gap:6px; }
-    .featured-row { border:1px solid #1e294f; border-radius:10px; padding:8px 10px; background:#0b132b; font-size:12px; color:var(--muted); margin-bottom:6px; }
-    .featured-row:last-child { margin-bottom:0; }
-    .featured-row.active { border-color: var(--accent); color:#e6eefc; }
-    .featured-row .label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; color:var(--muted); margin-bottom:2px; }
+    .moves-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .moves-list button {
+      width: 100%;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(36, 55, 108, 0.8);
+      background: rgba(9, 16, 36, 0.9);
+      color: #f2f6ff;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      box-shadow: none;
+    }
+    .moves-list button.recommended::before {
+      content: "★";
+      color: var(--accent);
+      margin-right: 6px;
+      font-size: 12px;
+    }
+    .moves-list button.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(110, 231, 255, 0.4);
+      background: rgba(110, 231, 255, 0.12);
+    }
+    .moves-list button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .moves-list button .label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+    }
+    .moves-list.mini { gap: 4px; }
+    .moves-list.mini button {
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+    #featuredMoves {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .featured-row {
+      border: 1px solid rgba(40, 60, 108, 0.8);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(8, 16, 36, 0.9);
+      font-size: 12px;
+      color: var(--muted);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .featured-row.active {
+      border-color: rgba(110, 231, 255, 0.6);
+      color: #f2f6ff;
+      box-shadow: 0 0 0 1px rgba(110, 231, 255, 0.28);
+    }
+    .featured-row .label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
     .featured-row.active .label { color: var(--accent); }
-    .statline { margin-top:6px; font-size:13px; color: var(--muted); }
-    .team { display: grid; grid-template-columns: 1fr; gap: 10px; }
-    .team .slot { width: 100%; }
-    .rankings { display:grid; gap:10px; }
-    .rank-item { background:#0f1734; border:1px solid #2a396b; border-radius:12px; padding:10px; display:flex; align-items:center; justify-content:space-between; }
-    .rank-item .l { display:flex; align-items:center; gap:10px; }
-    .rank-item .r { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
-    .rank-item .r .top { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-    .dot { width:10px; height:10px; border-radius:50%; background:#6ee7ff; }
-    .score { font-variant-numeric: tabular-nums; font-weight:700; }
-    .hidden { display:none !important; }
-    .voice-btn { display:flex; align-items:center; gap:8px; justify-content:center; }
-    #voiceBtn.disabled { opacity: .5; cursor: not-allowed; }
-    .mic { width: 10px; height: 20px; border-radius: 10px; border:2px solid #6ee7ff; position:relative; }
-    .mic::after { content:""; position:absolute; bottom:-6px; left:50%; transform:translateX(-50%); width:12px; height:2px; background:#6ee7ff; }
-    footer { max-width:1100px; margin: 0 auto 40px; padding: 0 22px; color: var(--muted); }
+    .statline {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .team {
+      display: grid;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .slot {
+      background: rgba(8, 16, 36, 0.72);
+      border: 1px dashed rgba(47, 68, 118, 0.6);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: rgba(142, 163, 199, 0.7);
+    }
+    .slot.filled {
+      display: block;
+      border-style: solid;
+      border-color: rgba(40, 60, 108, 0.85);
+      background: rgba(10, 18, 38, 0.92);
+      padding: 12px;
+      color: inherit;
+    }
+    .team-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      width: 100%;
+    }
+    .team-entry__content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .team-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: 1px solid rgba(47, 68, 118, 0.75);
+      background: rgba(7, 12, 26, 0.95);
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .team-entry .team-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 120px;
+    }
+    .team-entry .team-actions button { width: 100%; }
+    .team-moves {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .team-moves .label {
+      font-weight: 600;
+      color: #f2f6ff;
+      margin-right: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 11px;
+      display: inline-block;
+    }
+    .team-moves.small { font-size: 11px; text-align: right; }
+    .team-moves.small .label { font-size: 10px; }
+    .team-summary-trigger {
+      margin-top: 12px;
+      display: flex;
+    }
+    .team-summary-trigger button {
+      width: auto;
+      margin-left: auto;
+    }
+    .rankings {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .rank-item {
+      background: rgba(8, 16, 36, 0.85);
+      border: 1px solid rgba(40, 60, 108, 0.85);
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .rank-item .l {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .rank-item .r {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .rank-item .r .top {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(110, 231, 255, 0.65);
+    }
+    .score {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+    .hidden { display: none !important; }
+    .voice-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+    }
+    #voiceBtn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .mic {
+      width: 12px;
+      height: 24px;
+      border-radius: 12px;
+      border: 2px solid #021020;
+      background: rgba(2, 16, 32, 0.9);
+      position: relative;
+      box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.1);
+    }
+    .mic::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 3px;
+      border-radius: 3px;
+      background: rgba(2, 16, 32, 0.8);
+    }
+    footer {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      padding: 0 22px;
+      color: var(--muted);
+      position: relative;
+      z-index: 1;
+    }
+    footer p { line-height: 1.6; }
     a { color: var(--accent); }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#0e1530; border:1px solid #2a396b; padding:2px 6px; border-radius:6px; }
-    .team-moves { margin-top:6px; font-size:12px; color: var(--muted); display:flex; flex-direction:column; gap:2px; }
-    .team-moves .label { font-weight:600; color:#e6eefc; margin-right:4px; text-transform:uppercase; letter-spacing:.04em; font-size:11px; }
-    .team-moves.small { font-size:11px; text-align:right; }
-    .team-moves.small .label { font-size:10px; }
-    @media (max-width: 900px){ main { grid-template-columns: 1fr; } }
+    .kbd {
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: rgba(8, 16, 36, 0.9);
+      border: 1px solid rgba(36, 55, 108, 0.8);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #f2f6ff;
+    }
+    /* Team summary overlay */
+    .team-summary {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 16, 0.72);
+      backdrop-filter: blur(18px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 18px;
+      transition: opacity 0.2s ease;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .team-summary.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .team-summary__card {
+      width: min(920px, 100%);
+      max-height: 80vh;
+      overflow-y: auto;
+      background: rgba(16, 24, 48, 0.96);
+      border: 1px solid rgba(86, 112, 180, 0.55);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: 0 24px 70px rgba(5, 10, 30, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .team-summary__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .team-summary__header h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0.03em;
+    }
+    .team-summary__content {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .team-summary-intro {
+      font-size: 14px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .team-summary-team {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .team-summary-team-member {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(8, 16, 36, 0.85);
+      border: 1px solid rgba(40, 60, 108, 0.7);
+      font-size: 13px;
+    }
+    .team-summary-team-member img {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid rgba(47, 68, 118, 0.8);
+      background: rgba(7, 12, 26, 0.9);
+      image-rendering: pixelated;
+    }
+    .team-summary-warning {
+      font-size: 13px;
+      color: #facc15;
+      background: rgba(59, 37, 10, 0.32);
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .team-coverage h3,
+    .team-breakdown h3 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+    .team-coverage-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .coverage-card {
+      background: rgba(8, 16, 36, 0.9);
+      border: 1px solid rgba(40, 60, 108, 0.75);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .coverage-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(110, 231, 255, 0.5);
+    }
+    .coverage-card.muted { opacity: 0.4; }
+    .coverage-counts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .coverage-count {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(40, 60, 108, 0.6);
+      background: rgba(12, 20, 42, 0.85);
+      color: var(--muted);
+    }
+    .coverage-count:not(.has-value) {
+      opacity: 0.5;
+    }
+    .coverage-count strong {
+      font-variant-numeric: tabular-nums;
+      color: #f2f6ff;
+    }
+    .coverage-count.weak {
+      border-color: rgba(248, 113, 113, 0.45);
+      background: rgba(127, 29, 29, 0.35);
+      color: var(--bad);
+    }
+    .coverage-count.resist {
+      border-color: rgba(74, 222, 128, 0.4);
+      background: rgba(20, 83, 45, 0.35);
+      color: var(--good);
+    }
+    .coverage-count.immune {
+      border-color: rgba(253, 224, 71, 0.4);
+      background: rgba(113, 63, 18, 0.35);
+      color: #fde68a;
+    }
+    .team-breakdown-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .team-breakdown-card {
+      background: rgba(8, 16, 36, 0.92);
+      border: 1px solid rgba(40, 60, 108, 0.8);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .team-breakdown-card .card-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .summary-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(47, 68, 118, 0.8);
+      background: rgba(7, 12, 26, 0.9);
+      image-rendering: pixelated;
+    }
+    .team-breakdown-card .card-title {
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.03em;
+    }
+    .team-breakdown-card .card-body {
+      display: grid;
+      gap: 10px;
+    }
+    .team-breakdown-card .label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .type-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .type-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: capitalize;
+      border: 1px solid color-mix(in srgb, var(--type-color, rgba(62, 86, 146, 0.8)) 60%, transparent);
+      background: color-mix(in srgb, var(--type-color, rgba(12, 20, 42, 0.9)) 45%, rgba(12, 20, 42, 0.9) 55%);
+      color: color-mix(in srgb, var(--type-color, #dceaff) 60%, #f2f6ff 40%);
+    }
+    .type-chip .type-mult {
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+      opacity: 0.75;
+      color: inherit;
+    }
+    .type-chip.weak {
+      background: rgba(127, 29, 29, 0.4);
+      border-color: rgba(248, 113, 113, 0.5);
+      color: #fecaca;
+    }
+    .type-chip.resist {
+      background: rgba(20, 83, 45, 0.4);
+      border-color: rgba(74, 222, 128, 0.5);
+      color: #bbf7d0;
+    }
+    .type-chip.immune {
+      background: rgba(113, 63, 18, 0.4);
+      border-color: rgba(250, 204, 21, 0.45);
+      color: #fde68a;
+    }
+    .type-chip.muted {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(36, 55, 108, 0.7);
+      color: var(--muted);
+    }
+    @media (max-width: 1020px) {
+      main { grid-template-columns: 1fr; }
+      header h1::after { display: none; }
+      .result { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      main { padding: 24px 16px 40px; }
+      header { padding: 20px 18px 8px; }
+      header h1 { font-size: 20px; }
+      .row { grid-template-columns: 1fr; }
+      .team-summary__card { padding: 18px; }
+    }
   </style>
 </head>
 <body>
@@ -120,6 +792,9 @@
           <button id="addToTeamBtn">Add to team</button>
         </div>
         <div class="hint">Team is saved locally in your browser (no internet needed).</div>
+        <div class="team-summary-trigger">
+          <button id="teamSummaryBtn" class="ghost" type="button" aria-expanded="false" aria-controls="teamSummaryPanel">Team type summary</button>
+        </div>
       </div>
     </section>
 
@@ -154,6 +829,16 @@
     </section>
   </main>
 
+  <div id="teamSummaryPanel" class="team-summary hidden" role="dialog" aria-modal="true" aria-labelledby="teamSummaryTitle" aria-hidden="true">
+    <div class="team-summary__card" tabindex="-1">
+      <div class="team-summary__header">
+        <h2 id="teamSummaryTitle">Team type coverage</h2>
+        <button type="button" id="closeTeamSummary" class="ghost">Close</button>
+      </div>
+      <div id="teamSummaryContent" class="team-summary__content"></div>
+    </div>
+  </div>
+
   <footer>
     <p><b>Offline data:</b> This page looks for <span class="kbd">data/pokemon.min.json</span> and local sprites in <span class="kbd">sprites/</span> (e.g. <span class="kbd">sprites/006.png</span>). If not found, it falls back to a tiny built-in sample so you can test instantly. Replace the JSON with a full dataset for all Pokémon.</p>
     <p class="hint">Voice search works in the browser build (Chrome/Edge). The desktop app runs fully offline but does not include voice input.</p>
@@ -183,6 +868,26 @@
     dark:     { fighting:.5, psychic:2, ghost:2, dark:.5, fairy:.5 },
     steel:    { fire:.5, water:.5, electric:.5, ice:2, rock:2, fairy:2, steel:.5 },
     fairy:    { fire:.5, fighting:2, poison:.5, dragon:2, dark:2, steel:.5 }
+  };
+  const TYPE_COLORS = {
+    normal: '#a8a77a',
+    fire: '#ee8130',
+    water: '#6390f0',
+    electric: '#f7d02c',
+    grass: '#7ac74c',
+    ice: '#96d9d6',
+    fighting: '#c22e28',
+    poison: '#a33ea1',
+    ground: '#e2bf65',
+    flying: '#a98ff3',
+    psychic: '#f95587',
+    bug: '#a6b91a',
+    rock: '#b6a136',
+    ghost: '#735797',
+    dragon: '#6f35fc',
+    dark: '#705746',
+    steel: '#b7b7ce',
+    fairy: '#d685ad',
   };
 
   function effectiveness(attackType, defendTypes){
@@ -541,6 +1246,10 @@
   const rankingsEl = document.getElementById('rankings');
   const leagueSelect = document.getElementById('leagueSelect');
   const featuredMovesEl = document.getElementById('featuredMoves');
+  const teamSummaryBtn = document.getElementById('teamSummaryBtn');
+  const teamSummaryPanel = document.getElementById('teamSummaryPanel');
+  const teamSummaryContent = document.getElementById('teamSummaryContent');
+  const closeTeamSummaryBtn = document.getElementById('closeTeamSummary');
 
   // ------------------ Helpers ------------------
   function byName(name){
@@ -552,13 +1261,58 @@
     p = pool.find(x => x.name.toLowerCase().startsWith(name)) || pool.find(x => x.name.toLowerCase().includes(name));
     return p || null;
   }
-  function formatTypes(types){ return types.map(t=>`<span class="type">${t}</span>`).join(''); }
+  function typeLabel(type){
+    const text = (type || '').toString().replace(/-/g, ' ');
+    return text.replace(/\b\w/g, c => c.toUpperCase());
+  }
+  function typeColor(type){
+    return TYPE_COLORS[type] || '#6f7bff';
+  }
+  function formatTypes(types){
+    return (types || []).map(t => {
+      const label = typeLabel(t);
+      const color = typeColor(t);
+      return `<span class="type" data-type="${t}" style="--type-color:${color}">${label}</span>`;
+    }).join('');
+  }
+  function formatMultiplierValue(mult){
+    if (mult === 0) return '0';
+    const rounded = Math.abs(mult - Math.round(mult)) < 1e-2 ? Math.round(mult) : Number(mult.toFixed(2));
+    return String(rounded);
+  }
+  function breakdownMultipliers(m){
+    const entries = Object.entries(m || {});
+    const mapEntry = (type, mult) => ({
+      type,
+      label: typeLabel(type),
+      mult,
+      multiplierText: `×${formatMultiplierValue(mult)}`,
+    });
+    return {
+      weak: entries.filter(([,v])=>v>1).sort((a,b)=>b[1]-a[1]).map(([type, mult])=>mapEntry(type, mult)),
+      res: entries.filter(([,v])=>v>0 && v<1).sort((a,b)=>a[1]-b[1]).map(([type, mult])=>mapEntry(type, mult)),
+      imm: entries.filter(([,v])=>v===0).map(([type])=>({ type, label: typeLabel(type), mult:0, multiplierText:'×0' })),
+    };
+  }
   function listFromMults(m){
-    const entries = Object.entries(m);
-    const weak = entries.filter(([,v])=>v>1).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`${t}×${v}`);
-    const res = entries.filter(([,v])=>v>0 && v<1).sort((a,b)=>a[1]-b[1]).map(([t,v])=>`${t}×${v}`);
-    const imm = entries.filter(([,v])=>v===0).map(([t])=>t);
-    return {weak, res, imm};
+    const breakdown = breakdownMultipliers(m);
+    return {
+      weak: breakdown.weak.map(entry => `${entry.label} ${entry.multiplierText}`),
+      res: breakdown.res.map(entry => `${entry.label} ${entry.multiplierText}`),
+      imm: breakdown.imm.map(entry => entry.label),
+    };
+  }
+  function renderTypeChipList(list, variant){
+    if (!Array.isArray(list) || !list.length){
+      return '<span class="type-chip muted">None</span>';
+    }
+    return list.map(entry => {
+      const color = typeColor(entry.type);
+      const mult = entry.multiplierText && variant !== 'immune'
+        ? `<span class="type-mult">${entry.multiplierText}</span>`
+        : (variant === 'immune' ? `<span class="type-mult">${entry.multiplierText || '×0'}</span>` : '');
+      return `<span class="type-chip ${variant}" style="--type-color:${color}"><span>${entry.label}</span>${mult}</span>`;
+    }).join('');
   }
   function normalizeMove(move){
     if (!move) return null;
@@ -818,19 +1572,29 @@
     const num = String(dex).padStart(3,'0');
     const sanitizedSlug = slug.replace(/[^a-z0-9-]/g,'');
     const preferSlugArt = Boolean(sanitizedSlug && sanitizedSlug.includes('-'));
-    const slugSources = sanitizedSlug ? [
+    const localSlugSources = sanitizedSlug ? [
       `sprites/${sanitizedSlug}.png`,
+      `sprites/${sanitizedSlug}.webp`,
       `sprites/${num}-${sanitizedSlug}.png`,
+      `sprites/${num}-${sanitizedSlug}.webp`,
+    ].filter(Boolean) : [];
+    const localBaseSources = [
+      `sprites/${num}.png`,
+      `sprites/${num}.webp`,
+    ];
+    const remoteEnabled = typeof window !== 'undefined' && window.POKEDEX_ENABLE_REMOTE_SPRITES === true;
+    const remoteSlugSources = remoteEnabled && sanitizedSlug ? [
       `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug}.png`,
       sanitizedSlug.endsWith('-shadow') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-shadow$/, '')}.png` : null,
       sanitizedSlug.endsWith('-purified') ? `https://img.pokemondb.net/sprites/home/normal/${sanitizedSlug.replace(/-purified$/, '')}.png` : null,
     ].filter(Boolean) : [];
-    const baseSources = [
-      `sprites/${num}.png`,
-      dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dex}.png` : null,
-      dex ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png` : null,
-    ].filter(Boolean);
-    const combined = preferSlugArt ? [...slugSources, ...baseSources] : [...baseSources, ...slugSources];
+    const remoteBaseSources = remoteEnabled && dex ? [
+      `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dex}.png`,
+      `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png`,
+    ] : [];
+    const combined = preferSlugArt
+      ? [...localSlugSources, ...localBaseSources, ...remoteSlugSources, ...remoteBaseSources]
+      : [...localBaseSources, ...localSlugSources, ...remoteBaseSources, ...remoteSlugSources];
     const sources = combined.filter(Boolean);
     const uniqueSources = [];
     for (const src of sources){ if (!uniqueSources.includes(src)) uniqueSources.push(src); }
@@ -1046,6 +1810,135 @@
       rankingsEl.appendChild(el);
     });
   }
+  function renderTeamSummary(){
+    if (!teamSummaryContent) return;
+    teamSummaryContent.innerHTML = '';
+    const teamNames = getTeam();
+    const resolved = teamNames
+      .map(name => POKEMON.find(p => p && p.name === name && p.released !== false))
+      .filter(Boolean);
+    const missingCount = teamNames.length - resolved.length;
+    if (!resolved.length){
+      const empty = document.createElement('div');
+      empty.className = 'hint';
+      empty.textContent = 'Add Pokémon to your team to explore combined weaknesses and resistances.';
+      teamSummaryContent.appendChild(empty);
+      return;
+    }
+    const intro = document.createElement('div');
+    intro.className = 'team-summary-intro';
+    intro.innerHTML = `<p>Current team (<strong>${resolved.length}</strong>/3) for ${leagueLabel(currentLeague)}.</p>`;
+    const teamRow = document.createElement('div');
+    teamRow.className = 'team-summary-team';
+    resolved.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'team-summary-team-member';
+      item.innerHTML = `<img alt="${p.name}" class="summary-thumb" /><span>${p.name}</span>`;
+      teamRow.appendChild(item);
+      const img = item.querySelector('img');
+      if (img) setSprite(img, p);
+    });
+    intro.appendChild(teamRow);
+    teamSummaryContent.appendChild(intro);
+    if (missingCount > 0){
+      const warn = document.createElement('div');
+      warn.className = 'team-summary-warning';
+      warn.textContent = `${missingCount} team Pokémon are unavailable in the dataset and were skipped.`;
+      teamSummaryContent.appendChild(warn);
+    }
+    const coverageSection = document.createElement('section');
+    coverageSection.className = 'team-coverage';
+    coverageSection.innerHTML = '<h3>Coverage overview</h3>';
+    const grid = document.createElement('div');
+    grid.className = 'team-coverage-grid';
+    coverageSection.appendChild(grid);
+    const coverageEntries = TYPES.map(type => ({
+      type,
+      label: typeLabel(type),
+      color: typeColor(type),
+      weak: 0,
+      resist: 0,
+      immune: 0,
+    }));
+    const coverageMap = new Map(coverageEntries.map(entry => [entry.type, entry]));
+    resolved.forEach(p => {
+      const mults = defendMultipliers(p.types || []);
+      TYPES.forEach(type => {
+        const entry = coverageMap.get(type);
+        if (!entry) return;
+        const mult = mults[type];
+        if (mult === 0) entry.immune += 1;
+        else if (mult > 1) entry.weak += 1;
+        else if (mult < 1) entry.resist += 1;
+      });
+    });
+    coverageEntries.forEach(entry => {
+      const card = document.createElement('div');
+      card.className = 'coverage-card';
+      if (!entry.weak && !entry.resist && !entry.immune) card.classList.add('muted');
+      card.innerHTML = `
+        <div class="type-chip-row"><span class="type-chip" style="--type-color:${entry.color}">${entry.label}</span></div>
+        <div class="coverage-counts">
+          <span class="coverage-count weak${entry.weak ? ' has-value' : ''}"><span>Weak</span><strong>${entry.weak}</strong></span>
+          <span class="coverage-count resist${entry.resist ? ' has-value' : ''}"><span>Resist</span><strong>${entry.resist}</strong></span>
+          <span class="coverage-count immune${entry.immune ? ' has-value' : ''}"><span>Immune</span><strong>${entry.immune}</strong></span>
+        </div>`;
+      grid.appendChild(card);
+    });
+    teamSummaryContent.appendChild(coverageSection);
+    const detailSection = document.createElement('section');
+    detailSection.className = 'team-breakdown';
+    detailSection.innerHTML = '<h3>Individual breakdown</h3>';
+    const detailGrid = document.createElement('div');
+    detailGrid.className = 'team-breakdown-grid';
+    detailSection.appendChild(detailGrid);
+    resolved.forEach(p => {
+      const breakdown = breakdownMultipliers(defendMultipliers(p.types || []));
+      const card = document.createElement('article');
+      card.className = 'team-breakdown-card';
+      card.innerHTML = `
+        <div class="card-head">
+          <img class="summary-thumb" alt="${p.name}" />
+          <div>
+            <div class="card-title">${p.name}</div>
+            <div class="types">${formatTypes(p.types || [])}</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div><span class="label">Weak to</span><div class="type-chip-row">${renderTypeChipList(breakdown.weak, 'weak')}</div></div>
+          <div><span class="label">Resists</span><div class="type-chip-row">${renderTypeChipList(breakdown.res, 'resist')}</div></div>
+          <div><span class="label">Immune to</span><div class="type-chip-row">${renderTypeChipList(breakdown.imm, 'immune')}</div></div>
+        </div>`;
+      detailGrid.appendChild(card);
+      const img = card.querySelector('img.summary-thumb');
+      if (img) setSprite(img, p);
+    });
+    teamSummaryContent.appendChild(detailSection);
+  }
+  function isTeamSummaryOpen(){
+    return Boolean(teamSummaryPanel && teamSummaryPanel.classList.contains('visible'));
+  }
+  function openTeamSummary(){
+    if (!teamSummaryPanel || !teamSummaryBtn || teamSummaryBtn.disabled) return;
+    renderTeamSummary();
+    teamSummaryPanel.classList.remove('hidden');
+    teamSummaryPanel.classList.add('visible');
+    teamSummaryPanel.setAttribute('aria-hidden', 'false');
+    teamSummaryBtn.setAttribute('aria-expanded', 'true');
+    const focusTarget = teamSummaryPanel.querySelector('.team-summary__card');
+    if (focusTarget && typeof focusTarget.focus === 'function'){
+      focusTarget.focus();
+    }
+  }
+  function closeTeamSummary(){
+    if (!teamSummaryPanel) return;
+    teamSummaryPanel.classList.remove('visible');
+    teamSummaryPanel.classList.add('hidden');
+    teamSummaryPanel.setAttribute('aria-hidden', 'true');
+    if (teamSummaryBtn){
+      teamSummaryBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
   function populateSelectors(){
     const pool = RELEASED_POKEMON.length ? RELEASED_POKEMON : POKEMON;
     const sorted = [...pool].sort((a,b)=>a.name.localeCompare(b.name));
@@ -1088,29 +1981,34 @@
   function renderTeam(){
     const t = getTeam();
     teamSlots.innerHTML = '';
+    let hasValid = false;
     for (let i=0;i<3;i++){
       const name = t[i];
       const slot = document.createElement('div');
       slot.className = 'slot';
       if (name){
+        slot.classList.add('filled');
         const p = POKEMON.find(x=>x.name===name);
         if (!p || p.released === false){
           slot.innerHTML = `
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <div>
+            <div class="team-entry">
+              <div class="team-entry__content">
                 <b>${name}</b>
                 <div class="hint">Data not available (unreleased or missing from dataset).</div>
               </div>
-              <button style="width:auto; padding:6px 10px;" onclick="removeFromTeam(${i})">Remove</button>
+              <div class="team-actions">
+                <button type="button" class="ghost danger" onclick="removeFromTeam(${i})">Remove</button>
+              </div>
             </div>`;
         } else {
+          hasValid = true;
           const moveset = getActiveMoveset(p, currentLeague);
           const fastText = moveset.fast ? describeMove(moveset.fast) : '–';
           const chargedText = moveset.charged && moveset.charged.length ? moveset.charged.map(describeMove).join(', ') : '–';
           slot.innerHTML = `
             <div class="team-entry">
               <img class="team-thumb" alt="${p.name}" />
-              <div style="flex:1;">
+              <div class="team-entry__content">
                 <b>${p.name}</b>
                 <div class="types">${formatTypes(p.types)}</div>
                 <div class="team-moves">
@@ -1119,8 +2017,8 @@
                 </div>
               </div>
               <div class="team-actions">
-                <button type="button" class="team-edit" data-slug="${p.slug}" style="width:auto;">Edit moves</button>
-                <button type="button" style="width:auto;" onclick="removeFromTeam(${i})">Remove</button>
+                <button type="button" class="ghost team-edit" data-slug="${p.slug}">Edit moves</button>
+                <button type="button" class="ghost danger" onclick="removeFromTeam(${i})">Remove</button>
               </div>
             </div>`;
           const img = slot.querySelector('img.team-thumb');
@@ -1142,6 +2040,14 @@
       }
       teamSlots.appendChild(slot);
     }
+    if (teamSummaryBtn){
+      teamSummaryBtn.disabled = !hasValid;
+      teamSummaryBtn.setAttribute('aria-disabled', hasValid ? 'false' : 'true');
+    }
+    if (!hasValid && isTeamSummaryOpen()){
+      closeTeamSummary();
+    }
+    renderTeamSummary();
   }
   function removeFromTeam(i){
     const t = getTeam();
@@ -1234,6 +2140,33 @@
       }
     };
   }
+  if (teamSummaryBtn){
+    teamSummaryBtn.addEventListener('click', ()=>{
+      if (teamSummaryBtn.disabled) return;
+      openTeamSummary();
+    });
+  }
+  if (closeTeamSummaryBtn){
+    closeTeamSummaryBtn.addEventListener('click', ()=>{
+      closeTeamSummary();
+      if (teamSummaryBtn && typeof teamSummaryBtn.focus === 'function'){ teamSummaryBtn.focus(); }
+    });
+  }
+  if (teamSummaryPanel){
+    teamSummaryPanel.addEventListener('click', (event)=>{
+      if (event.target === teamSummaryPanel){
+        closeTeamSummary();
+        if (teamSummaryBtn && typeof teamSummaryBtn.focus === 'function'){ teamSummaryBtn.focus(); }
+      }
+    });
+  }
+  document.addEventListener('keydown', (event)=>{
+    if (event.key === 'Escape' && isTeamSummaryOpen()){
+      event.preventDefault();
+      closeTeamSummary();
+      if (teamSummaryBtn && typeof teamSummaryBtn.focus === 'function'){ teamSummaryBtn.focus(); }
+    }
+  });
 
   // ------------------ Boot ------------------
   (async function(){
