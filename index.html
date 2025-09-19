@@ -859,6 +859,7 @@
     <p class="hint">Voice search works in the browser build (Chrome/Edge). The desktop app runs fully offline but does not include voice input.</p>
   </footer>
 
+  <script src="data/mega-origin-sprites.js"></script>
   <script>
   // ------------------ Type Chart (attack -> defense multiplier) ------------------
   const TYPES = [
@@ -1586,6 +1587,15 @@
     const slug = (pokemon.slug || pokemon.name || '').toString().toLowerCase();
     const num = String(dex).padStart(3,'0');
     const sanitizedSlug = slug.replace(/[^a-z0-9-]/g,'');
+    const specialSprites = (typeof window !== 'undefined' && window.MEGA_ORIGIN_SPRITES) ? window.MEGA_ORIGIN_SPRITES : null;
+    const specialSource = specialSprites && (specialSprites[sanitizedSlug] || specialSprites[slug]);
+    if (specialSource){
+      imgEl.onerror = null;
+      imgEl.src = specialSource;
+      imgEl.alt = pokemon.name || 'Pokémon';
+      imgEl.classList.remove('no-sprite');
+      return;
+    }
     const preferSlugArt = Boolean(sanitizedSlug && sanitizedSlug.includes('-'));
     const localSlugSources = sanitizedSlug ? [
       `sprites/${sanitizedSlug}.png`,
