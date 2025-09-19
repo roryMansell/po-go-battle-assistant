@@ -52,6 +52,16 @@ Data prep: Python (scripts for JSON + sprite processing)
 
 Desktop packaging: Electron (Node.js ecosystem)
 
+## 📦 Updating the Pokémon GO dataset
+
+The app reads from `data/pokemon.min.json`. To refresh the data (all Pokémon, forms, and available moves straight from the latest Game Master), run:
+
+```bash
+python scripts/build_pokemon_json.py
+```
+
+The script downloads the current Game Master from the PokeMiners project, expands every form (regional, costume, mega, shadow, etc.), and writes a compact JSON file ready for offline use.
+
 ## 📜 License
 
 Data & sprites belong to their respective creators (Pokémon © Nintendo/Game Freak).
